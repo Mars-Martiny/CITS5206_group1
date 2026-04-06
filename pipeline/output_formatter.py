@@ -7,9 +7,8 @@ OUTPUT_COLUMN_MAPPING = {
 }
 
 MODEL_OUTPUT_COLUMNS = [
-    "predicted_energy_type",
-    "energy_confidence"
-]
+        "inx_id", "incident_date",	"incident_description",	"predicted_energy_type", "energy_confidence", "energy_score", "predicted_damage_potential",	"damage_confidence", "damage_score", "fatal_flag", "energy_action_required", "damage_action_required"
+    ]
 
 def format_output(df):
     df_out = pd.DataFrame()

@@ -1,26 +1,41 @@
 import pandas as pd
-from pipeline.output_formatter import format_output
+import pytest
+
+from pipeline.io import load_data
 
 
-def test_format_output_mapping():
+def test_load_data_predict_success(tmp_path):
     """
-    Test that format_output() correctly maps input columns to output schema.
+    Test that load_data() correctly loads valid input in predict mode.
 
-    This test verifies:
-    - Source columns are mapped to the correct output field names
-    - Key output fields exist in the result
-    - Data values are preserved correctly during transformation
+    This test verifies that:
+    - a valid CSV file can be read successfully
+    - the returned DataFrame contains the expected number of rows
     """
+    file_path = tmp_path / "predict.csv"
     df = pd.DataFrame({
         "Reference": [1],
-        "Event Description": ["Incident"],
         "Date and Time of Event": ["2026-04-01"],
-        "predicted_energy_type": ["Energy"],
-        "energy_confidence": [0.9],
+        "Event Description": ["Event A"],
     })
+    df.to_csv(file_path, index=False)
 
-    result = format_output(df)
+    result = load_data(file_path, mode="predict")
 
-    assert "inx_id" in result.columns
-    assert "incident_date" in result.columns
-    assert result.loc[0, "incident_date"] == "2026-04-01"
+    assert len(result) == 1
+
+
+def test_load_data_missing_column(tmp_path):
+    """
+    Test that load_data() raises a ValueError when required columns are missing.
+
+    This ensures the input validation logic rejects invalid datasets.
+    """
+    file_path = tmp_path / "bad.csv"
+    df = pd.DataFrame({
+        "Reference": [1],
+    })
+    df.to_csv(file_path, index=False)
+
+    with pytest.raises(ValueError):
+        load_data(file_path, mode="predict")

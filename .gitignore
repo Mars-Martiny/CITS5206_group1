@@ -6,3 +6,5 @@ ignored_dir
 main_notebook.ipynb
 dataset
 dataset/*
+trained_models
+trained_models/*

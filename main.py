@@ -5,7 +5,7 @@ from pipeline.preprocessing import preprocess
 from pipeline.inference import predict
 from pipeline.output_formatter import format_output
 from pipeline.retrain import retrain
-from models.dummy_model import DummyModel
+from prediction_models.dummy_model import DummyModel
 
 
 def main():

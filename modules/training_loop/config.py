@@ -8,8 +8,7 @@ import torch.optim as optim
 
 from .utility import _safe_class_name
 
-from models.bilstm import BiLSTMClassifier
-from models.gru import BiGRUClassifier
+from modules.models import BiLSTMClassifier, BiGRUClassifier
 
 # CONFIG AND UTILITY FUNCTIONS FOR TRAINING LOOP
 def _build_train_config(

@@ -20,7 +20,6 @@ class BiLSTMClassifier(nn.Module):
     Output:
         Raw logits with shape (batch_size, num_classes)
     """
-
     def __init__(
         self,
         vocab_size: int,
@@ -31,6 +30,7 @@ class BiLSTMClassifier(nn.Module):
         dropout: float = 0.3,
         padding_idx: int = 0,
     ):
+        """Initialize the model."""
         super().__init__()
 
         self.embedding = nn.Embedding(

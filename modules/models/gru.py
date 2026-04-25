@@ -54,7 +54,7 @@ class BiGRUClassifier(nn.Module):
         )
 
     def forward(self, D: torch.Tensor, DL: torch.Tensor | None = None) -> torch.Tensor:
-        """Feed forward"""
+        """Feed forward."""
         embedded = self.embedding(D)
 
         if DL is not None:

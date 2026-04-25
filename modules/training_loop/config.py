@@ -8,6 +8,8 @@ import torch.optim as optim
 
 from .utility import _safe_class_name
 
+from models.bilstm import BiLSTMClassifier
+from models.gru import BiGRUClassifier
 
 # CONFIG AND UTILITY FUNCTIONS FOR TRAINING LOOP
 def _build_train_config(
@@ -70,6 +72,10 @@ def _build_train_config(
         save_name = run_name.lower().replace(" ", "_")[:10]
     else:
         save_name = model_type.lower().replace(" ", "_")[:10]
+
+    # Auto-detect if we need to pass sequence lengths to the model (for RNN-based models)
+    if isinstance(model, (BiLSTMClassifier, BiGRUClassifier)):
+        need_length = True
 
     config = {
         "model": model,

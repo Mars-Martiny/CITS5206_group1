@@ -18,7 +18,6 @@ class BiGRUClassifier(nn.Module):
     output:
         logits: (batch_size, num_classes)
     """
-    """Initialize the model."""
     def __init__(
         self,
         vocab_size: int,
@@ -29,6 +28,7 @@ class BiGRUClassifier(nn.Module):
         dropout: float = 0.3,
         padding_idx: int = 0,
     ):
+        """Initialize the model."""
         super().__init__()
 
         self.embedding = nn.Embedding(
@@ -54,8 +54,7 @@ class BiGRUClassifier(nn.Module):
         )
 
     def forward(self, D: torch.Tensor, DL: torch.Tensor | None = None) -> torch.Tensor:
-        """Feed forward
-        """
+        """Feed forward"""
         embedded = self.embedding(D)
 
         if DL is not None:

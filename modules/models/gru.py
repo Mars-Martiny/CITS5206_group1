@@ -6,20 +6,19 @@ from torch.nn.utils.rnn import pack_padded_sequence
 
 
 class BiGRUClassifier(nn.Module):
-    """
-    Forward-only BiGRU classifier.
+    """Forward-only BiGRU classifier.
 
-    Usage：
+    Usage:
         logits = model(D, DL)
 
-    input：
+    input:
         D  : (batch_size, seq_len)
         DL : (batch_size,) 可选
 
-    output：
+    output:
         logits: (batch_size, num_classes)
     """
-
+    """Initialize the model."""
     def __init__(
         self,
         vocab_size: int,
@@ -55,10 +54,8 @@ class BiGRUClassifier(nn.Module):
         )
 
     def forward(self, D: torch.Tensor, DL: torch.Tensor | None = None) -> torch.Tensor:
+        """Feed forward
         """
-        feed forward
-        """
-
         embedded = self.embedding(D)
 
         if DL is not None:

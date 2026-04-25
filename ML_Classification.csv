@@ -1,0 +1,2 @@
+inx_id,incident_description,incident_date,predicted_energy_type,energy_confidence,energy_score,predicted_damage_potential,damage_confidence,damage_score,fatal_flag,energy_action_required,damage_action_required
+R1,Worker slipped,2025-01-01 10:00:00,Energy,0.9,0.9,High,0.8,0.8,1,False,False

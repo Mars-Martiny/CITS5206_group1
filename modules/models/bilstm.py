@@ -6,8 +6,7 @@ from torch.nn.utils.rnn import pack_padded_sequence
 
 
 class BiLSTMClassifier(nn.Module):
-    """
-    Forward-only BiLSTM classifier.
+    """Forward-only BiLSTM classifier.
 
     Expected usage in training loop:
         logits = model(D, DL)
@@ -57,8 +56,7 @@ class BiLSTMClassifier(nn.Module):
         )
 
     def forward(self, D: torch.Tensor, DL: torch.Tensor | None = None) -> torch.Tensor:
-        """
-        Forward pass.
+        """Forward pass.
 
         Parameters
         ----------
@@ -69,12 +67,11 @@ class BiLSTMClassifier(nn.Module):
             Sequence length tensor, shape (batch_size,).
             If provided, packed sequences are used so padding tokens are ignored.
 
-        Returns
+        Returns:
         -------
         torch.Tensor
             Raw logits, shape (batch_size, num_classes).
         """
-
         embedded = self.embedding(D)
 
         if DL is not None:

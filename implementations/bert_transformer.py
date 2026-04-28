@@ -1,6 +1,5 @@
 """Run BERT transformer experiments for Energy Type and Risk classification."""
 
-import pandas as pd
 import torch
 import torch.optim as optim
 
@@ -10,14 +9,12 @@ from modules.embedding.bert_tokenizer import BertTokenizerWrapper
 from modules.embedding.bert_embedding import BertEmbeddingBackend
 from modules.encoding.label_encoder import LabelEncoder
 from modules.models.bert_classifier import BertClassifier
-from modules.training_loop.config import _build_train_config
-from modules.training_loop.train_loop import train_model_loop
-from modules.training_loop.evaluate import evaluate
+from modules.training_loop import training
 
 
 def encode_label_column(train_df, valid_df, test_df, label_col):
     """Fit label encoder on train labels and transform train/valid/test.
-    
+
     :param train_df: Training dataframe containing the label column.
     :type train_df: pandas.DataFrame
     :param valid_df: Validation dataframe containing the label column.
@@ -26,9 +23,9 @@ def encode_label_column(train_df, valid_df, test_df, label_col):
     :type test_df: pandas.DataFrame
     :param label_col: Name of the column containing label data.
     :type label_col: str
-    
-    :returns: Tuple of (train_df, valid_df, test_df, label_encoder, class_names)
-    :rtype: Tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame, LabelEncoder, list[str]]
+
+    :returns: Tuple of encoded dataframes, label encoder, and class names.
+    :rtype: tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame, LabelEncoder, list[str]]
     """
     label_encoder = LabelEncoder()
     label_encoder.fit(train_df[label_col].astype(str).tolist())
@@ -37,9 +34,15 @@ def encode_label_column(train_df, valid_df, test_df, label_col):
     valid_df = valid_df.copy()
     test_df = test_df.copy()
 
-    train_df[label_col] = label_encoder.encode_many(train_df[label_col].astype(str).tolist())
-    valid_df[label_col] = label_encoder.encode_many(valid_df[label_col].astype(str).tolist())
-    test_df[label_col] = label_encoder.encode_many(test_df[label_col].astype(str).tolist())
+    train_df[label_col] = label_encoder.encode_many(
+        train_df[label_col].astype(str).tolist()
+    )
+    valid_df[label_col] = label_encoder.encode_many(
+        valid_df[label_col].astype(str).tolist()
+    )
+    test_df[label_col] = label_encoder.encode_many(
+        test_df[label_col].astype(str).tolist()
+    )
 
     class_names = [
         label_encoder.id_to_label[i]
@@ -68,7 +71,7 @@ def run_bert_experiment(
     threshold=0.8,
 ):
     """Train and evaluate a BERT classifier for one target label.
-    
+
     :param train_df: Training dataframe.
     :type train_df: pandas.DataFrame
     :param valid_df: Validation dataframe.
@@ -79,29 +82,31 @@ def run_bert_experiment(
     :type text_col: str
     :param label_col: Name of the column containing label data.
     :type label_col: str
-    :param run_name: Name for this training run (used in saved model filename).
+    :param run_name: Name for this training run.
     :type run_name: str
-    :param fine_tune: Whether to fine-tune the BERT model or keep it frozen.
+    :param fine_tune: Whether to fine-tune BERT or keep it frozen.
     :type fine_tune: bool
-    :param pooling: Pooling strategy for sentence embedding ("cls" or "mean").
+    :param pooling: Pooling strategy for sentence embedding, either "cls" or "mean".
     :type pooling: str
-    :param batch_size: Batch size for training and evaluation.
+    :param batch_size: Batch size for dataloaders.
     :type batch_size: int
     :param epochs: Maximum number of training epochs.
     :type epochs: int
-    :param learning_rate: Learning rate for the optimizer. If None, defaults to 2e-5 for fine-tuning and 1e-4 for frozen BERT.
+    :param learning_rate: Learning rate. If None, uses 2e-5 when fine-tuning and 1e-4 when frozen.
     :type learning_rate: float | None
-    :param dropout: Dropout rate for the classifier head.
+    :param dropout: Dropout rate for classifier head.
     :type dropout: float
     :param max_length: Maximum sequence length for BERT tokenizer.
     :type max_length: int
-    :param use_class_weights: Whether to use class weights in the loss function to handle class imbalance.
+    :param use_class_weights: Whether to use class weights in the loss function.
     :type use_class_weights: bool
-    :param weight_decay: Weight decay (L2 regularization) factor for the optimizer.
+    :param weight_decay: Weight decay factor for AdamW.
     :type weight_decay: float
-    
-    :returns: Tuple of (run_summary, test_metrics) where run_summary contains training history and test_metrics contains evaluation results on the test set.
-    :rtype: Tuple[dict, dict]
+    :param threshold: Confidence threshold for auto-classification analysis.
+    :type threshold: float
+
+    :returns: Run summary from the shared training pipeline.
+    :rtype: dict
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -118,7 +123,7 @@ def run_bert_experiment(
         dropout=0.1,
         pooling=pooling,
         fine_tune=fine_tune,
-        )
+    )
 
     tokenizer_wrapper = BertTokenizerWrapper(bert_config)
 
@@ -165,7 +170,7 @@ def run_bert_experiment(
         lr=learning_rate,
         weight_decay=weight_decay,
     )
-    
+
     criterion_weights = None
 
     if use_class_weights:
@@ -174,7 +179,7 @@ def run_bert_experiment(
         weights = weights / weights.mean()
         criterion_weights = torch.tensor(weights.values, dtype=torch.float)
 
-    config = _build_train_config(
+    run_summary = training(
         model=model,
         energy_model=True,
         model_type="BERT",
@@ -234,9 +239,6 @@ def run_bert_experiment(
             "pooling": pooling,
             "fine_tune": fine_tune,
         },
-)
+    )
 
-    run_summary = train_model_loop(config)
-    test_metrics = evaluate(config)
-
-    return run_summary, test_metrics
+    return run_summary

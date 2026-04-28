@@ -58,11 +58,13 @@ def training(
     #
     criterion_type="cross_entropy",
     criterion_weights=None,
-    criterion_args={}, 
+    criterion_args={},
     #
     train_dl=None,
     valid_dl=None,
     test_dl=None,
+    use_weighted_sampler=False,
+    train_labels=None,
     #
     epochs=10,
     patience=3,
@@ -88,6 +90,7 @@ def training(
     extra_config=None,
     log_leaderboard=True,
     leaderboard_dir="leaderboard",
+    verbose=True,
     **_,
 ):
     """Build training config and run the full training loop.
@@ -111,6 +114,8 @@ def training(
         train_dl:  DataLoader for training data.
         valid_dl:  DataLoader for validation data.
         test_dl:   DataLoader for test data.
+        use_weighted_sampler: If True, use WeightedRandomSampler to handle class imbalance. Defaults to False.
+        train_labels: List or tensor of training labels. Required if use_weighted_sampler is True.
 
         epochs:              Number of training epochs.
         patience:            Early stopping patience in epochs.
@@ -136,6 +141,7 @@ def training(
         extra_config:  Optional dict of additional config keys to merge.
         log_leaderboard: Whether to append this run to the leaderboard CSV. Defaults to True.
         leaderboard_dir: Directory for leaderboard.csv and owner.conf. Defaults to 'leaderboard'.
+        verbose: Enable printing the training loop message. Defaults to True.
 
     Returns:
         Run summary dictionary with history, best epoch, and best metric value.
@@ -161,6 +167,8 @@ def training(
         train_dl=train_dl,
         valid_dl=valid_dl,
         test_dl=test_dl,
+        use_weighted_sampler=use_weighted_sampler,
+        train_labels=train_labels,
         #
         epochs=epochs,
         patience=patience,
@@ -188,5 +196,6 @@ def training(
 
     train_config["log_leaderboard"] = log_leaderboard
     train_config["leaderboard_dir"] = leaderboard_dir
+    train_config["verbose"] = verbose
 
     return train_model_loop(train_config)

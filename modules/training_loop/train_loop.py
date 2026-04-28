@@ -39,13 +39,16 @@ def train_model_loop(
     best_epoch = None
     best_model_state_dict = None
 
-    print("=" * 120)
-    print(f"Training the {config['model_type']} model")
-    print(f"Run name: {config['run_name']}")
-    print(
-        f"Best model tracked by: {config['best_metric']} ({config['best_metric_mode']})"
-    )
-    print("=" * 120)
+    verbose = config.get("verbose", True)
+
+    if verbose:
+        print("=" * 120)
+        print(f"Training the {config['model_type']} model")
+        print(f"Run name: {config['run_name']}")
+        print(
+            f"Best model tracked by: {config['best_metric']} ({config['best_metric_mode']})"
+        )
+        print("=" * 120)
 
     training_start_time = time.time()
 
@@ -65,19 +68,20 @@ def train_model_loop(
 
         current_metric_value = val_metrics[config["best_metric"]]
 
-        print("-" * 120)
-        print(
-            f"| Epoch {epoch:03d} "
-            f"| Time: {run_saver.history['training']['epoch_time_sec'][-1]:7.2f}s "
-            f"| Train Loss: {train_metrics['loss']:.4f} "
-            f"| Train Acc: {train_metrics['accuracy'] * 100:.2f}% "
-            f"| Val Loss: {val_metrics['loss']:.4f} "
-            f"| Val Acc: {val_metrics['accuracy'] * 100:.2f}% "
-            f"| Val F1 Macro: {val_metrics['f1_macro']:.4f} "
-            f"| Val F1 Weighted: {val_metrics['f1_weighted']:.4f} "
-            f"| Best {config['best_metric']}: {current_metric_value:.4f} |"
-        )
-        print("-" * 120)
+        if verbose:
+            print("-" * 120)
+            print(
+                f"| Epoch {epoch:03d} "
+                f"| Time: {run_saver.history['training']['epoch_time_sec'][-1]:7.2f}s "
+                f"| Train Loss: {train_metrics['loss']:.4f} "
+                f"| Train Acc: {train_metrics['accuracy'] * 100:.2f}% "
+                f"| Val Loss: {val_metrics['loss']:.4f} "
+                f"| Val Acc: {val_metrics['accuracy'] * 100:.2f}% "
+                f"| Val F1 Macro: {val_metrics['f1_macro']:.4f} "
+                f"| Val F1 Weighted: {val_metrics['f1_weighted']:.4f} "
+                f"| Best {config['best_metric']}: {current_metric_value:.4f} |"
+            )
+            print("-" * 120)
 
         # Check for improvement and update best model if needed, otherwise increment patience counter
         if _is_better(
@@ -90,14 +94,15 @@ def train_model_loop(
         else:
             patience_counter += 1
             if patience_counter >= config["patience"]:
-                print(f"Early stopping triggered at epoch {epoch}.")
+                if verbose:
+                    print(f"Early stopping triggered at epoch {epoch}.")
                 break
 
     total_train_time = time.time() - training_start_time
 
     if best_model_state_dict is not None:
         config["model"].load_state_dict(best_model_state_dict)
-    
+
     # Final evaluation on test set using the best model
     test_metrics = evaluate(config)
     run_saver.append_metrics("test", test_metrics, training=False)
@@ -127,11 +132,12 @@ def train_model_loop(
                 leaderboard_dir=config.get("leaderboard_dir", "leaderboard"),
             )
 
-        print(f"Run saved to: {config['save_dir']}")
-        print(f"Total training time: {total_train_time:.4f}s")
-        print(f"Best epoch: {best_epoch}")
-        print(f"Best {config['best_metric']}: {best_metric_value:.6f}")
-        print(f"Model saved to: {model_path}")
-        print(f"Run summary saved to: {summary_path}")
+        if verbose:
+            print(f"Run saved to: {config['save_dir']}")
+            print(f"Total training time: {total_train_time:.4f}s")
+            print(f"Best epoch: {best_epoch}")
+            print(f"Best {config['best_metric']}: {best_metric_value:.6f}")
+            print(f"Model saved to: {model_path}")
+            print(f"Run summary saved to: {summary_path}")
 
     return run_summary

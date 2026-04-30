@@ -1,3 +1,4 @@
-"""Model module exposing sequence classifiers."""
+"""Model architectures used by the project."""
+
 from .bilstm import BiLSTMClassifier
 from .gru import BiGRUClassifier

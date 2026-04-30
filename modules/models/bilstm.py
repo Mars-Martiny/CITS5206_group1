@@ -6,7 +6,7 @@ from torch.nn.utils.rnn import pack_padded_sequence
 
 
 class BiLSTMClassifier(nn.Module):
-    """Forward-only BiLSTM classifier.
+    """BiLSTM classifier module with architecture and forward pass only.
 
     Expected usage in training loop:
         logits = model(D, DL)

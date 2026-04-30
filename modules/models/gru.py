@@ -6,7 +6,7 @@ from torch.nn.utils.rnn import pack_padded_sequence
 
 
 class BiGRUClassifier(nn.Module):
-    """Forward-only BiGRU classifier.
+    """BiGRU classifier module with architecture and forward pass only.
 
     Usage:
         logits = model(D, DL)

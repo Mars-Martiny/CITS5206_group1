@@ -96,6 +96,33 @@ def training(
 ):
     """Build training config and run the full training loop.
 
+    This function is the main entry point for training PyTorch models.
+    Models such as BiLSTMClassifier can be instantiated outside this
+    function and passed in through the `model` argument.
+
+    For BiLSTM/GRU models, `_build_train_config()` automatically detects
+    the model type and sets `need_length=True`, so the training loop will
+    call the model with `(D, DL)` instead of only `D`.
+
+    Example:
+        >>> from modules.models import BiLSTMClassifier
+        >>> from modules.training_loop import training
+        >>>
+        >>> model = BiLSTMClassifier(
+        ...     vocab_size=1000,
+        ...     embedding_dim=128,
+        ...     hidden_dim=128,
+        ...     num_classes=5,
+        ... )
+        >>>
+        >>> run_summary = training(
+        ...     model=model,
+        ...     train_dl=train_dl,
+        ...     valid_dl=valid_dl,
+        ...     model_type="BiLSTM",
+        ...     num_classes=5,
+        ... )
+
     Args:
         model:          PyTorch model to train.
         energy_model:   True = predict energy type; False = predict risk type.
@@ -153,6 +180,7 @@ def training(
     Returns:
         Run summary dictionary with history, best epoch, and best metric value.
     """
+    
     # All top-level inputs are collected into `config` and that config is passed everywhere else.
     # This keeps the function signatures clean and makes it easy to add new parameters without needing to change a lot of function signatures.
     train_config = _build_train_config(

@@ -68,7 +68,7 @@ def train_one_epoch(config):
 
     # Compute classification metrics
     metrics = _compute_classification_metrics(
-        y_true=all_targets, y_pred=all_preds, num_classes=config["num_classes"]
+        y_true=all_targets, y_pred=all_preds, config=config
     )
     metrics["loss"] = avg_loss
     metrics["lr"] = _get_learning_rates(config)

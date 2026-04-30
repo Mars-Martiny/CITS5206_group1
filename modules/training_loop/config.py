@@ -1,52 +1,96 @@
 """Training configuration builder for the main training loop."""
 
 import time
+from datetime import datetime
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
 from .utility import _safe_class_name
+from .loss import get_loss_function
+from .imbalance import make_weighted_sampler
 
 from modules.models import BiLSTMClassifier, BiGRUClassifier
 
 # CONFIG AND UTILITY FUNCTIONS FOR TRAINING LOOP
 def _build_train_config(
     model,
+    energy_model,
+    model_type,
+    need_length,
+    #
+    optimiser,
+    optimiser_args,
+    #
+    scheduler,
+    scheduler_step_per_batch,
+    #
+    criterion_type,
+    criterion_weights,
+    criterion_args,
+    #
     train_dl,
     valid_dl,
+    test_dl,
+    use_weighted_sampler,
+    train_labels,
+    #
     epochs,
-    device,
     patience,
-    criterion_weights,
-    model_type="Simple",
-    save=True,
-    optimiser=None,
-    scheduler=None,
-    criterion=None,
-    need_length=False,
-    energy_model=False,
-    best_metric="loss",
-    best_metric_mode=None,
-    clip_grad_max_norm=1.0,
-    scheduler_step_per_batch=False,
-    save_dir="trained_models",
-    run_name=None,
-    num_classes=None,
-    extra_config=None,
+    num_classes,
+    class_dict,
+    clip_grad_max_norm,
+    #
+    best_metric,
+    best_metric_mode,
+    #
+    threshold,
+    temperature,
+    use_temperature,
+    #
+    parameters,
+    device,
+    #
+    compute_train_metrics,      # unused currently
+    save,
+    parent_dir,
+    run_name,
+    #
+    extra_config,
+    requirements,
 ):
     """Build the training configuration dictionary."""
+    # Generate a timestamp for unique run identification and directory naming
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     # DEFAULT OPTIMISER, SCHEDULER, CRITERION // Set default optimiser, scheduler, and criterion if not provided
     if optimiser is None:
-        optimiser = optim.Adam(model.parameters(), lr=1e-3)
+        lr = optimiser_args.get("lr", 1e-3) if optimiser_args else 1e-3
+        optimiser = optim.Adam(model.parameters(), lr=lr)
 
-    if scheduler is None:
+
+    if use_weighted_sampler and train_labels is not None:
+        sampler = make_weighted_sampler(train_labels, num_classes=num_classes)
+        train_dl = torch.utils.data.DataLoader(
+            train_dl.dataset,
+            batch_size=train_dl.batch_size,
+            sampler=sampler,
+        )
+
+    # False means "no scheduler" (explicit opt-out); None means "use default"
+    if scheduler is False:
+        scheduler = None
+    elif scheduler is None:
         scheduler = optim.lr_scheduler.StepLR(optimiser, step_size=1, gamma=0.95)
 
-    if criterion is None:
-        if criterion_weights is not None:
-            criterion_weights = criterion_weights.to(device)
-        criterion = nn.CrossEntropyLoss(weight=criterion_weights)
+    # LOSS FUNCTION // Get the loss function based on the specified type and weights
+    criterion = get_loss_function(
+        criterion_type=criterion_type,
+        weight=criterion_weights,
+        criterion_args=criterion_args,
+        device=device,
+    )
 
     if best_metric not in {
         "loss",
@@ -71,35 +115,57 @@ def _build_train_config(
         save_name = run_name.lower().replace(" ", "_")[:10]
     else:
         save_name = model_type.lower().replace(" ", "_")[:10]
+        run_name = f"{save_name}_run_{timestamp}"
 
     # Auto-detect if we need to pass sequence lengths to the model (for RNN-based models)
     if isinstance(model, (BiLSTMClassifier, BiGRUClassifier)):
         need_length = True
 
+    # BUILD CONFIG DICTIONARY // Build the configuration dictionary with all training parameters and metadata
     config = {
         "model": model,
+        "energy_model": energy_model,
+        "model_type": model_type,
+        "need_length": need_length,
+        #
+        "optimiser": optimiser,
+        #
+        "scheduler": scheduler,
+        "scheduler_step_per_batch": scheduler_step_per_batch,
+        #
+        "criterion": criterion,
+        "criterion_type": criterion_type,
+        #
         "train_dl": train_dl,
         "valid_dl": valid_dl,
+        "test_dl": test_dl,
+        "use_weighted_sampler": use_weighted_sampler,
+        #
         "epochs": epochs,
-        "device": device,
         "patience": patience,
-        "criterion_weights": criterion_weights,
-        "criterion": criterion,
-        "optimiser": optimiser,
-        "scheduler": scheduler,
-        "model_type": model_type,
+        "num_classes": num_classes,
+        "class_dict": class_dict,
+        "clip_grad_max_norm": clip_grad_max_norm,
+        #
+        "compute_train_metrics": compute_train_metrics,
         "save": save,
-        "save_dir": save_dir,
+        "parent_dir": parent_dir,
         "save_name": save_name,
-        "run_name": run_name or f"{save_name}_run_{int(time.time())}",
-        "need_length": need_length,
-        "energy_model": energy_model,
+        "run_name": run_name,
+        #
         "best_metric": best_metric,
         "best_metric_mode": best_metric_mode,
-        "clip_grad_max_norm": clip_grad_max_norm,
-        "scheduler_step_per_batch": scheduler_step_per_batch,
-        "num_classes": num_classes,
+        #
+        "threshold": threshold,
+        "temperature": temperature,
+        "use_temperature": use_temperature,
+        #
+        "parameters": parameters,
+        "device": device,
+        "requirements": requirements,
+        #
         "started_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "timestamp": timestamp,
         # Useful run metadata
         "metadata": {
             "model_class": _safe_class_name(model),

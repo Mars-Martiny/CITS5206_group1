@@ -5,3 +5,5 @@ spacy
 torch
 transformers
 matplotlib
+seaborn
+numpy

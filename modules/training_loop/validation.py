@@ -19,12 +19,10 @@ def validate(config):
             - criterion: The loss function for evaluation.
             - device: The device to run on (e.g., 'cpu' or 'cuda').
             - num_classes: Number of classes in the classification task.
-            - compute_val_metrics: Whether to compute detailed metrics
-            (precision, recall, F1) beyond loss and accuracy.
+            - class_dict: Dictionary mapping class indices to class names.
 
     Returns:
-        dict: Validation metrics including accuracy, precision, recall,
-            F1 macro, precision weighted, recall weighted, F1 weighted, and loss.
+        dict: Validation metrics from _compute_classification_metrics.
     """
     model = config["model"]
     criterion = config["criterion"]
@@ -54,7 +52,7 @@ def validate(config):
     metrics = _compute_classification_metrics(
         y_true=all_targets,
         y_pred=all_preds,
-        num_classes=config["num_classes"],
+        config=config,
     )
     metrics["loss"] = avg_loss
 

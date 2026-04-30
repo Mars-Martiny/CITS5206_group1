@@ -38,13 +38,61 @@ def _serialise_value(value):
 
 
 # DATALOADER BATCH UNPACKING // unpack batches from the dataloader and prepare them for model input.
+# def _unpack_batch(batch, config):
+#     """Unpack a dataloader batch and move tensors to the configured device.
+
+#     Assumes batch structure: (D, DL, Energy, Risk) with length, or
+#     (D, _, Energy, Risk) without length.
+#     """
+#     device = config["device"]
+#     need_length = config["need_length"]
+#     energy_model = config["energy_model"]
+
+#     if need_length:
+#         D, DL, Energy, Risk = batch
+#         D = D.to(device)
+#         DL = DL.to(device)
+#         Energy = Energy.to(device)
+#         Risk = Risk.to(device)
+#         logits = config["model"](D, DL)
+#     else:
+#         D, _, Energy, Risk = batch
+#         D = D.to(device)
+#         Energy = Energy.to(device)
+#         Risk = Risk.to(device)
+#         logits = config["model"](D)
+
+#     targets = Energy if energy_model else Risk
+#     return logits, targets
+
 def _unpack_batch(batch, config):
     """Unpack a dataloader batch and move tensors to the configured device.
 
-    Assumes batch structure: (D, DL, Energy, Risk) with length, or
-    (D, _, Energy, Risk) without length.
+    Supports both sequence batches and BERT-style dictionary batches.
+
+    Sequence batches use the structure ``(D, DL, Energy, Risk)``.
+    BERT batches use keys such as ``input_ids``, ``attention_mask``,
+    optional ``token_type_ids``, and ``label``.
     """
     device = config["device"]
+
+    if isinstance(batch, dict):
+        input_ids = batch["input_ids"].to(device)
+        attention_mask = batch["attention_mask"].to(device)
+        targets = batch["label"].to(device)
+
+        token_type_ids = batch.get("token_type_ids")
+        if token_type_ids is not None:
+            token_type_ids = token_type_ids.to(device)
+
+        logits = config["model"](
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+        )
+
+        return logits, targets
+
     need_length = config["need_length"]
     energy_model = config["energy_model"]
 

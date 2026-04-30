@@ -26,7 +26,8 @@ from modules.training_loop.utility import (
 # Import directly from the submodule to avoid pulling in run_saving (matplotlib)
 # via modules/training_loop/__init__.py
 from modules.training_loop.metrics import _compute_classification_metrics
-
+from modules.training_loop.loss import get_loss_function, FocalLoss
+from modules.training_loop.imbalance import compute_class_weights, make_weighted_sampler
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,14 @@ def _make_config(model, need_length=False, energy_model=False):
         "device": torch.device("cpu"),
         "need_length": need_length,
         "energy_model": energy_model,
+    }
+
+
+# A module-level fixture or variable
+@pytest.fixture
+def config():
+    return {
+        "num_classes": None,  # Will be set per test
     }
 
 
@@ -135,22 +144,34 @@ class TestSerialiseValue:
 # ── _compute_classification_metrics ──────────────────────────────────────────
 
 
+
+@pytest.fixture
+def config():
+    return {
+        "num_classes": 3,
+        "class_dict": {},
+        "threshold": 0.80,
+    }
+
 class TestComputeClassificationMetrics:
-    def test_perfect_predictions(self):
+    def test_perfect_predictions(self, config):
         y = torch.tensor([0, 1, 2, 0, 1, 2])
-        metrics = _compute_classification_metrics(y, y, num_classes=3)
+        config["num_classes"] = 3
+        metrics = _compute_classification_metrics(y, y, config)
         assert metrics["accuracy"] == pytest.approx(1.0, abs=1e-5)
         assert metrics["f1_macro"] == pytest.approx(1.0, abs=1e-5)
 
-    def test_all_wrong_accuracy_zero(self):
+    def test_all_wrong_accuracy_zero(self, config):
         y_true = torch.tensor([0, 0, 0])
         y_pred = torch.tensor([1, 1, 1])
-        metrics = _compute_classification_metrics(y_true, y_pred, num_classes=2)
+        config["num_classes"] = 2
+        metrics = _compute_classification_metrics(y_true, y_pred, config)
         assert metrics["accuracy"] == pytest.approx(0.0, abs=1e-5)
 
-    def test_returns_expected_keys(self):
+    def test_returns_expected_keys(self, config):
         y = torch.tensor([0, 1])
-        metrics = _compute_classification_metrics(y, y)
+        config["num_classes"] = None
+        metrics = _compute_classification_metrics(y, y, config)
         expected = {
             "accuracy",
             "precision_macro",
@@ -159,16 +180,24 @@ class TestComputeClassificationMetrics:
             "precision_weighted",
             "recall_weighted",
             "f1_weighted",
+            "class_metrics",
+            "confusion_matrix",
         }
         assert set(metrics.keys()) == expected
 
-    def test_empty_input_returns_zeros(self):
-        metrics = _compute_classification_metrics(torch.tensor([]), torch.tensor([]))
-        assert all(v == 0.0 for v in metrics.values())
+    def test_empty_input_returns_zeros(self, config):
+        config["num_classes"] = None
+        metrics = _compute_classification_metrics(torch.tensor([]), torch.tensor([]), config)
+        numeric_keys = ["accuracy", "precision_macro", "recall_macro", "f1_macro",
+                    "precision_weighted", "recall_weighted", "f1_weighted"]
+        assert all(metrics[k] == 0.0 for k in numeric_keys)
+        assert metrics["class_metrics"] == {}
+        assert metrics["confusion_matrix"] == []
 
-    def test_infers_num_classes(self):
+    def test_infers_num_classes(self, config):
         y = torch.tensor([0, 1, 2])
-        metrics = _compute_classification_metrics(y, y)  # num_classes not passed
+        config["num_classes"] = None
+        metrics = _compute_classification_metrics(y, y, config)  # num_classes not passed
         assert metrics["accuracy"] == pytest.approx(1.0, abs=1e-5)
 
 
@@ -222,3 +251,63 @@ class TestGetLearningRates:
         lrs = _get_learning_rates(config)
         assert len(lrs) == 1
         assert lrs[0] == pytest.approx(0.01)
+
+# ── get_loss_function ─────────────────────────────────────────────────────────
+
+
+class TestGetLossFunction:
+    def test_cross_entropy_returns_correct_type(self):
+        criterion = get_loss_function("cross_entropy")
+        assert isinstance(criterion, nn.CrossEntropyLoss)
+
+    def test_focal_returns_correct_type(self):
+        criterion = get_loss_function("focal")
+        assert isinstance(criterion, FocalLoss)
+
+    def test_unknown_type_raises(self):
+        with pytest.raises(ValueError):
+            get_loss_function("unknown")
+
+    def test_cross_entropy_with_weights(self):
+        weights = torch.tensor([1.0, 2.0, 3.0])
+        criterion = get_loss_function("cross_entropy", weight=weights)
+        assert isinstance(criterion, nn.CrossEntropyLoss)
+
+    def test_focal_forward_runs(self):
+        criterion = get_loss_function("focal")
+        logits = torch.randn(4, 3)
+        targets = torch.tensor([0, 1, 2, 0])
+        loss = criterion(logits, targets)
+        assert loss.item() > 0
+
+# ── imbalance ─────────────────────────────────────────────────────────────────
+
+class TestComputeClassWeights:
+    def test_returns_correct_num_classes(self):
+        labels = torch.tensor([0, 0, 0, 1, 2])
+        weights = compute_class_weights(labels, num_classes=3)
+        assert len(weights) == 3
+
+    def test_minority_class_gets_higher_weight(self):
+        labels = torch.tensor([0, 0, 0, 0, 1])
+        weights = compute_class_weights(labels, num_classes=2)
+        assert weights[1] > weights[0]
+
+    def test_infers_num_classes(self):
+        labels = torch.tensor([0, 1, 2])
+        weights = compute_class_weights(labels)
+        assert len(weights) == 3
+
+
+class TestMakeWeightedSampler:
+    def test_returns_sampler(self):
+        from torch.utils.data import WeightedRandomSampler
+        labels = torch.tensor([0, 0, 0, 1, 2])
+        sampler = make_weighted_sampler(labels, num_classes=3)
+        assert isinstance(sampler, WeightedRandomSampler)
+
+    def test_sampler_length_matches_labels(self):
+        from torch.utils.data import WeightedRandomSampler
+        labels = torch.tensor([0, 0, 1, 1, 2])
+        sampler = make_weighted_sampler(labels, num_classes=3)
+        assert len(sampler) == len(labels)

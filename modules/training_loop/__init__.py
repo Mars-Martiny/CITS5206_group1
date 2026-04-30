@@ -3,6 +3,8 @@
 from .config import _build_train_config
 from .train_loop import train_model_loop
 
+__all__ = ["training", "_build_train_config", "train_model_loop"]
+
 """
 TRAINING LOOP MODULE // Files related to the main training loop and its components
 - config: 
@@ -27,7 +29,6 @@ TRAINING LOOP MODULE // Files related to the main training loop and its componen
 Functionality notes (): 
  - Support for different loss functions 
     -> currently supports any loss function that can be called as `criterion(preds, labels)` and returns a scalar loss value. 
-        -> Could add support for more complex loss functions that require additional inputs (e.g., class weights, sample weights, etc.)
  - More detailed model saving 
     -> model saving is now more detailed
  - More detailed logging (e.g., using TensorBoard or a logging library instead of print statements)
@@ -45,55 +46,109 @@ Functionality notes ():
 # EXPOSED TRAINING FUNCTION // main function to call for training a model, which builds the config and calls the main training loop
 def training(
     model,
+    energy_model=False,
+    model_type="Simple",
+    need_length=False,
+    #
     optimiser=None,
+    optimiser_args={},
+    #
+    scheduler=None,  # need to be defined outside
+    scheduler_step_per_batch=False,
+    #
+    criterion_type="cross_entropy",
+    criterion_weights=None,
+    criterion_args={},
+    #
     train_dl=None,
     valid_dl=None,
+    test_dl=None,
+    use_weighted_sampler=False,
+    train_labels=None,
+    #
     epochs=10,
-    device="cpu",
     patience=3,
-    criterion_weights=None,
-    model_type="Simple",
-    save=True,
-    scheduler=None,  # need to be defined outside
-    criterion=None,  # need to be defined outside
-    need_length=False,
-    energy_model=False,
+    num_classes=None,
+    class_dict={},
+    clip_grad_max_norm=1.0,
+    #
     best_metric="loss",  # must be in: "loss", "accuracy", "precision_macro", "recall_macro", "f1_macro", "precision_weighted", "recall_weighted", "f1_weighted"
     best_metric_mode=None,
-    clip_grad_max_norm=1.0,
-    scheduler_step_per_batch=False,
-    save_dir="trained_models",
+    #
+    threshold=0.80,
+    temperature=1.5,
+    use_temperature=True,
+    #
+    parameters={},
+    device="cpu",
+    #
+    compute_train_metrics=True,
+    save=True,
+    parent_dir="trained_models",
     run_name=None,
-    compute_train_metrics=False,
-    num_classes=None,
+    #
     extra_config=None,
+    requirements={},
+    log_leaderboard=True,
+    leaderboard_dir="leaderboard",
+    verbose=True,
+    **_,
 ):
     """Build training config and run the full training loop.
 
     Args:
-        model: PyTorch model to train.
-        optimiser: Optimizer instance. Defaults to Adam with lr=1e-3.
-        train_dl: DataLoader for training data.
-        valid_dl: DataLoader for validation data.
-        epochs: Number of training epochs.
-        device: Device string, e.g. 'cpu' or 'cuda'.
-        patience: Early stopping patience in epochs.
-        criterion_weights: Optional class weights for the loss function.
-        model_type: Label used for saving and logging.
-        save: Whether to save model artifacts after training.
-        scheduler: Learning rate scheduler. Defaults to StepLR.
-        criterion: Loss function. Defaults to CrossEntropyLoss.
-        need_length: Whether the model expects sequence lengths as input.
-        energy_model: If True, predict energy type; otherwise predict risk.
-        best_metric: Metric used to select the best model checkpoint.
-        best_metric_mode: 'min' or 'max'. Inferred from best_metric if None.
-        clip_grad_max_norm: Max norm for gradient clipping.
-        scheduler_step_per_batch: Step scheduler per batch instead of per epoch.
-        save_dir: Directory to save model artifacts.
-        run_name: Optional name for the run.
-        compute_train_metrics: Whether to compute metrics on the training set.
-        num_classes: Number of output classes.
-        extra_config: Optional dict of additional config keys to merge.
+        model:          PyTorch model to train.
+        energy_model:   True = predict energy type; False = predict risk type.
+        model_type:     Label used for saving and logging.
+        need_length:    Whether the model expects sequence lengths as input.
+
+        optimiser:  Optimizer instance. Defaults to Adam with lr=1e-3.
+        optimiser_args: Dictionary of additional arguments for the optimizer.
+
+        scheduler:                  Learning rate scheduler. Defaults to StepLR.
+        scheduler_step_per_batch:   Step scheduler per batch instead of per epoch.
+
+        criterion_type:     Loss function type. One of 'cross_entropy', 'focal'. Defaults to 'cross_entropy'.
+        criterion_weights:  Optional class weights for the loss function.
+        criterion_args:     Dictionary of additional arguments for the loss function.
+
+        train_dl:  DataLoader for training data.
+        valid_dl:  DataLoader for validation data.
+        test_dl:   DataLoader for test data.
+        use_weighted_sampler: If True, use WeightedRandomSampler to handle class imbalance. Defaults to False.
+        train_labels: List or tensor of training labels. Required if use_weighted_sampler is True.
+
+        epochs:              Number of training epochs.
+        patience:            Early stopping patience in epochs.
+        num_classes:         Number of output classes.
+        class_dict:          Dictionary mapping class indices to class names // i.e. class index -> class name
+        clip_grad_max_norm:  Max norm for gradient clipping.
+
+        best_metric:         Metric used to select the best model checkpoint.
+        best_metric_mode:    Towards 'min' or 'max' // Inferred from best_metric if None.
+
+        threshold:        Confidence threshold for auto-classification.
+        temperature:      Temperature for scaling logits...if use_temperature is True.
+        use_temperature:  Whether to apply temperature scaling to logits.
+
+        parameters:  The training parameters in a dictionary format.
+        device:      Device string, e.g. 'cpu' or 'cuda'.
+
+        compute_train_metrics:  Whether to compute metrics on the training set.
+        save:                   Whether to save model artifacts after training.
+        parent_dir:             Directory to save model artifacts.
+        run_name:               Optional name for the run.
+            
+        extra_config:  Optional dict of additional config keys to merge.
+        requirements:  Optional client performance requirements dict, defaults to {}. 
+            Pass None to disable check. Keys:
+            - confidence_threshold: {"high": float, "medium": float} (values >1 treated as %)
+            - high_threshold: min fraction of predictions in high-confidence tier (default 0.70)
+            - fatal_accuracy: min recall on true fatal-class samples (default 0.95)
+            - f1_target: {class_index: min_f1} — use 0.0 to mark a class as having no target
+        log_leaderboard: Whether to append this run to the leaderboard CSV. Defaults to True.
+        leaderboard_dir: Directory for leaderboard.csv and owner.conf. Defaults to 'leaderboard'.
+        verbose: Enable printing the training loop message. Defaults to True.
 
     Returns:
         Run summary dictionary with history, best epoch, and best metric value.
@@ -102,28 +157,53 @@ def training(
     # This keeps the function signatures clean and makes it easy to add new parameters without needing to change a lot of function signatures.
     train_config = _build_train_config(
         model=model,
+        energy_model=energy_model,
+        model_type=model_type,
+        need_length=need_length,
+        #
+        optimiser=optimiser,
+        optimiser_args=optimiser_args,
+        #
+        scheduler=scheduler,
+        scheduler_step_per_batch=scheduler_step_per_batch,
+        #
+        criterion_type=criterion_type,
+        criterion_weights=criterion_weights,
+        criterion_args=criterion_args,
+        #
         train_dl=train_dl,
         valid_dl=valid_dl,
+        test_dl=test_dl,
+        use_weighted_sampler=use_weighted_sampler,
+        train_labels=train_labels,
+        #
         epochs=epochs,
-        device=device,
         patience=patience,
-        criterion_weights=criterion_weights,
-        model_type=model_type,
-        save=save,
-        optimiser=optimiser,
-        scheduler=scheduler,
-        criterion=criterion,
-        need_length=need_length,
-        energy_model=energy_model,
+        num_classes=num_classes,
+        class_dict=class_dict,
+        clip_grad_max_norm=clip_grad_max_norm,
+        #
         best_metric=best_metric,
         best_metric_mode=best_metric_mode,
-        clip_grad_max_norm=clip_grad_max_norm,
-        scheduler_step_per_batch=scheduler_step_per_batch,
-        save_dir=save_dir,
-        run_name=run_name,
+        #
+        threshold=threshold,
+        temperature=temperature,
+        use_temperature=use_temperature,
+        #
+        parameters=parameters,
+        device=device,
+        #
         compute_train_metrics=compute_train_metrics,
-        num_classes=num_classes,
+        save=save,
+        parent_dir=parent_dir,
+        run_name=run_name,
+        #
         extra_config=extra_config,
+        requirements=requirements,
     )
+
+    train_config["log_leaderboard"] = log_leaderboard
+    train_config["leaderboard_dir"] = leaderboard_dir
+    train_config["verbose"] = verbose
 
     return train_model_loop(train_config)

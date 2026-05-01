@@ -23,6 +23,14 @@ print(df.columns)
 ## Need to install contractions. Need to list this!
 # %pip install contractions
 
+# %% [markdown]
+# ## Notes
+# Please do not that this is residual code.
+# I start experimenting and rapidly prototype on .ipynb then after it is fixed and complete only then I move it to external module.
+#
+# Exercise caution on using these code as references
+#
+
 # %%
 from modules import OneTextPreProcessor
 
@@ -31,45 +39,6 @@ import json
 # Open and read the file
 with open('column_map.json', 'r') as file:
     column_map = json.load(file)
-
-# oneTextPreProcessor = OneTextPreProcessor(keep_numbers=True, column_map=column_map)
-# mod_df = oneTextPreProcessor.pre_process_df(df, column_map["Detailed Description of Event"])
-# mod_df
-
-# %%
-# oneTextPreProcessor = OneTextPreProcessor(keep_numbers=False, column_map=column_map)
-# mod_df = oneTextPreProcessor.pre_process_df(df, column_map["Detailed Description of Event"])
-# mod_df
-
-# %%
-import os
-
-data_dir = "dataset"
-df_list = {}
-
-# scan and read all CSV files
-for file in os.listdir(data_dir):
-    if file.endswith(".csv"):
-        file_path = os.path.join(data_dir, file)
-        
-        df = pd.read_csv(file_path)
-        
-        # rename columns
-        df = df.rename(columns=column_map)
-        
-        df_list[file] = df
-
-def check_class_dist(df, col_name): 
-  display(df[col_name].value_counts().to_frame(name="count"))
-
-
-for (key, value) in df_list.items():
-    print(f"Class distribution for {key}")
-    print("Energy Type Distributions:")
-    check_class_dist(value, "energy_type")
-    print("Potantial Damage Distributions:")
-    check_class_dist(value, "potential_damage")
-    print("="*32)
 
 # If wanted to use spacy transformer model, set to en_core_web_trf (better result, at 11x slower tradeoff)
 lemma_config = {
@@ -96,9 +65,12 @@ model1_train = pre_process("dataset/model1_train.csv")
 model1_valid = pre_process("dataset/model1_valid.csv")
 model1_test = pre_process("dataset/model1_test.csv")
 
-model2_train = pre_process("dataset/model2_train.csv")
-model2_valid = pre_process("dataset/model2_valid.csv")
-model2_test = pre_process("dataset/model2_test.csv")
+# model2_train = pre_process("dataset/model2_train.csv")
+# model2_valid = pre_process("dataset/model2_valid.csv")
+# model2_test = pre_process("dataset/model2_test.csv")
+
+# %%
+model1_train["energy_type"].value_counts()
 
 # %%
 tokens_col = f"description_tokens_lemma"
@@ -116,40 +88,51 @@ label_col = "energy_type"  # or "Potential Damage" for model2
 
 train_tokenized_docs = model1_train[tokens_col].tolist()
 val_tokenized_docs   = model1_valid[tokens_col].tolist()
+test_tokenized_docs  = model1_test[tokens_col].tolist()
 
 label_enc = LabelEncoder()
 label_enc.fit(model1_train[label_col].tolist())
 
 train_labels = torch.tensor(label_enc.encode_many(model1_train[label_col].tolist()))
 val_labels   = torch.tensor(label_enc.encode_many(model1_valid[label_col].tolist()))
+test_labels  = torch.tensor(label_enc.encode_many(model1_test[label_col].tolist()))
 
 # --- TF-IDF ---
 vectorizer = TFIDFVectorizer().fit(train_tokenized_docs)
 train_vecs = vectorizer.transform(train_tokenized_docs)
 val_vecs   = vectorizer.transform(val_tokenized_docs)
+test_vecs  = vectorizer.transform(test_tokenized_docs)
 
 train_dl = build_tfidf_dataloader(train_vecs, train_labels)
 val_dl   = build_tfidf_dataloader(val_vecs, val_labels, shuffle=False)
+test_dl  = build_tfidf_dataloader(test_vecs, test_labels, shuffle=False)
 
 num_classes = label_enc.num_classes
-model = TFIDFClassifier(vocab_size=len(vectorizer.vocab), num_classes=num_classes)
+model = TFIDFClassifier(vocab_size=len(vectorizer.vocab), num_classes=num_classes, hidden_dim=256)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model = model.to(device)
 
-config = _build_train_config(
+results = training(
     model_type="tf_idf",
     model=model,
     train_dl=train_dl,
     valid_dl=val_dl,
+    test_dl=test_dl,
     epochs=100,
     device=device,
-    patience=12,               # required — was missing
-    criterion_weights=None,   # required — None means equal class weights
+    patience=12,
+    criterion_weights=None,
     best_metric="f1_macro",
     need_length=False,
-    energy_model=True,        # True = use Energy labels, False = Risk labels
+    energy_model=True,
+    num_classes=num_classes,
+    requirements={
+        "confidence_threshold": {"high": 0.80, "medium": 0.50},
+        "high_threshold": 0.70,
+        "fatal_accuracy": 0.95,
+        "f1_target": {5: 0.70, 6: 0.70, 11: 0.70, 17: 0.70, 0:0.0}, # Class 0 (Animal) no target
+    }
 )
-results = training(**config)
 
 # %%
 from sklearn.metrics import classification_report
@@ -197,6 +180,27 @@ plt.tight_layout()
 plt.savefig("confusion_matrix.png", dpi=150)
 
 # %%
+import pandas as pd
+
+true_class = "Susceptible Part"
+pred_class = "Specialized Shape"
+
+true_idx = label_enc.encode(true_class)
+pred_idx = label_enc.encode(pred_class)
+
+mask = (val_labels == true_idx) & (preds == pred_idx)
+misclassified_indices = mask.nonzero()[0]
+
+text_col = column_map["Detailed Description of Event"]
+misclassified_texts = model1_valid.iloc[misclassified_indices][[text_col, "energy_type"]].copy()
+misclassified_texts["predicted"] = pred_class
+
+print(f"Found {len(misclassified_indices)} sample(s) labelled '{true_class}' but predicted as '{pred_class}':\n")
+pd.set_option("display.max_colwidth", None)
+misclassified_texts.reset_index(drop=True)
+
+
+# %%
 model1_valid.columns
 
 # %%
@@ -212,28 +216,26 @@ compare.to_csv("debugging.csv")
 
 # %%
 import pandas as pd
-import torch
-import numpy as np
+from modules.inference import run_inference
 
-# Get predictions with references
-model.eval()
-all_preds, all_true, all_refs = [], [], []
+# Run inference on the validation set
+infer_config = {
+    "model": model,
+    "device": device,
+    "need_length": False,
+    "energy_model": True,
+    "test_dl": val_dl,
+}
+infer_result = run_inference(infer_config)
 
-with torch.no_grad():
-    for i, batch in enumerate(valid_dl):
-        D, _, Energy, Risk = batch
-        D = D.to(device)
-        logits = model(D)
-        preds = logits.argmax(dim=1).cpu().numpy()
-        all_preds.extend(preds)
-        all_true.extend(Energy.numpy())
+all_preds = infer_result["all_preds"].numpy()
+all_true  = infer_result["all_targets"].numpy()
 
 # Decode labels
 pred_labels = label_enc.decode_many(all_preds)
 true_labels = label_enc.decode_many(all_true)
 
-# Build results df — we need to align with model1_valid by position
-# valid_dl was built without shuffling, so order is preserved
+# Build results df — valid_dl was built without shuffling, so order is preserved
 results_df = model1_valid.copy().reset_index(drop=True)
 results_df['pred_label'] = pred_labels
 results_df['true_label'] = true_labels
@@ -264,6 +266,42 @@ for true_cls, pred_cls in review_pairs:
     if subset.empty:
         continue
 
+valid_df = model1_valid.copy().reset_index(drop=True)
+valid_df["pred_label"] = pred_labels
+valid_df["true_label"] = true_labels
+valid_df["correct"]    = valid_df["pred_label"] == valid_df["true_label"]
+
+print(f"Test accuracy : {valid_df['correct'].mean():.3f}  ({valid_df['correct'].sum()}/{len(valid_df)})")
+valid_df.head(3)
+
+
+
+# %%
+# ── Inference on test set ─────────────────────────────────────────────────
+test_tokenized_docs = model1_test[tokens_col].tolist()
+test_labels_enc     = torch.tensor(label_enc.encode_many(model1_test[label_col].tolist()))
+test_vecs           = vectorizer.transform(test_tokenized_docs)
+test_dl             = build_tfidf_dataloader(test_vecs, test_labels_enc, shuffle=False)
+
+test_infer_config = {
+    "model": model,
+    "device": device,
+    "need_length": False,
+    "energy_model": True,
+    "test_dl": test_dl,
+}
+test_result = run_inference(test_infer_config)
+
+test_pred_labels = label_enc.decode_many(test_result["all_preds"].numpy())
+test_true_labels = label_enc.decode_many(test_result["all_targets"].numpy())
+
+test_df = model1_test.copy().reset_index(drop=True)
+test_df["pred_label"] = test_pred_labels
+test_df["true_label"] = test_true_labels
+test_df["correct"]    = test_df["pred_label"] == test_df["true_label"]
+
+print(f"Test accuracy : {test_df['correct'].mean():.3f}  ({test_df['correct'].sum()}/{len(test_df)})")
+test_df.head(3)
 
 
 # %%

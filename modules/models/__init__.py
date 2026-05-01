@@ -1,2 +1,2 @@
-"""Model module exposing feature extractors and classifiers."""
+"""Model architectures used by the project."""
 from .rf_classifier import RandomForestClassifierWrapper

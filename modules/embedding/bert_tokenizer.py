@@ -39,7 +39,7 @@ class BertTokenizerWrapper:
         """
         return self.tokenizer(
             list(texts),
-            padding=True,
+            padding="max_length",
             truncation=True,
             max_length=self.config.max_length,
             return_tensors="pt",

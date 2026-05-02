@@ -90,7 +90,7 @@ class TFIDFClassifier(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(vocab_size, hidden_dim),
             nn.ReLU(),
-            nn.Dropout(0.3),
+            nn.Dropout(0.5),
             nn.Linear(hidden_dim, num_classes),
         )
 

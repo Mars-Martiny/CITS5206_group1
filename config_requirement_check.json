@@ -1,0 +1,11 @@
+{
+    "confidence_threshold": {"high": 0.80, "medium": 0.50},
+    "high_threshold": 0.70,
+    "fatal_accuracy": 0.95,
+    "f1_target": {
+        "5": 0.70,
+        "6": 0.70, 
+        "11": 0.70, 
+        "17": 0.70
+    }
+}

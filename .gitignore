@@ -10,3 +10,4 @@ trained_models
 trained_models/*
 .idea
 data_corrector.py
+leaderboard/owner.conf

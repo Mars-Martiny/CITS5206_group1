@@ -13,7 +13,6 @@ def run_feature_pipeline(
     device: str = "cpu",
 ):
     """Train classifier on extracted features, then run inference + evaluation."""
-
     # extract features from training set and train classifier
     X_train, y_train_energy, y_train_risk = [], [], []
 

@@ -11,6 +11,7 @@ class FeatureClassifierWrapper(nn.Module):
     """Wrap a feature extractor and classical classifier as a PyTorch model."""
 
     def __init__(self, feature_extractor: nn.Module, classifier):
+        """Initialize wrapper with feature extractor and classifier."""
         super().__init__()
         self.feature_extractor = feature_extractor
         self.classifier = classifier

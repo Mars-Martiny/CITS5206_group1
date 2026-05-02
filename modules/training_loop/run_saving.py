@@ -74,6 +74,15 @@ class RunSaver:
                 "fatal_flag_rate": [],
                 "meets_requirement": [],
                 "threshold_used": [],
+                # Client requirement results (populated when config["requirements"] is set)
+                "confidence_high_rate": [],
+                "confidence_medium_rate": [],
+                "confidence_low_rate": [],
+                "req_high_confidence_met": [],
+                "fatal_accuracy": [],
+                "req_fatal_accuracy_met": [],
+                "per_class_requirements": [],
+                "req_all_f1_targets_met": [],
             },
         }
 
@@ -184,12 +193,12 @@ class RunSaver:
         plt.close()
 
     # PLOT METRICS // Generate and save plots for each metric in the history
-    def plot_base_metrics(self, metric, x_values, best_epoch, save_dir, save_name, training=True):
+    def plot_base_metrics(self, metric, x_values, best_epoch, save_dir, save_name, y_axis_ranges, x_max, training=True):
         """Plot a single metric for training and validation over epochs."""
         plt.figure()
         if training:
             plt.plot(x_values, self.history["training"]["train"][metric], label=f"Train {metric}")
-            if metric != "lr":  # Don't plot validation metrics for learning rate 
+            if metric != "lr":  # Don't plot validation metrics for learning rate
                 plt.plot(x_values, self.history["training"]["val"][metric], label=f"Val {metric}")
         else:
             plt.plot(x_values, self.history["test"][metric], label=f"Test {metric}")
@@ -238,15 +247,14 @@ class RunSaver:
         x_values = list(range(1, num_epochs + 1))
 
 
-        # plot each metric for train and val over epochs  
+        # plot each metric for train and val over epochs (test is a single evaluation, not a time series)
         for metric in ["loss", "accuracy", "f1_macro", "precision_weighted", "f1_weighted"]:
-            self.plot_base_metrics(metric, x_values, best_epoch, save_dir, save_name, training=True)
-            self.plot_base_metrics(metric, x_values, best_epoch, save_dir, save_name, training=False)
+            self.plot_base_metrics(metric, x_values, best_epoch, save_dir, save_name, y_axis_ranges, x_max, training=True)
 
 
         # plot learning rate if available
         if self.history["training"]["train"]["lr"]:
-            self.plot_base_metrics("lr", x_values, best_epoch, save_dir, save_name, training=True)
+            self.plot_base_metrics("lr", x_values, best_epoch, save_dir, save_name, y_axis_ranges, x_max, training=True)
 
 
         # Plot class-specific metrics if available
@@ -328,7 +336,7 @@ class RunSaver:
             "f1_macro": "#6c3483",  # dark purple
         }
 
-        combined_metrics = ["loss", "accuracy", "precision_weighted", "recall_macro", "f1_macro"]
+        combined_metrics = ["accuracy", "precision_macro", "recall_macro", "f1_macro"]
 
         for metric in combined_metrics:
             plt.plot(
@@ -364,5 +372,3 @@ class RunSaver:
         plot_path = Path(save_dir) / f"{save_name}_combined_metrics_plot.png"
         plt.savefig(plot_path)
         plt.close()
-
-

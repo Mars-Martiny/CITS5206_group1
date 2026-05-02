@@ -58,11 +58,13 @@ def training(
     #
     criterion_type="cross_entropy",
     criterion_weights=None,
-    criterion_args={}, 
+    criterion_args={},
     #
     train_dl=None,
     valid_dl=None,
     test_dl=None,
+    use_weighted_sampler=False,
+    train_labels=None,
     #
     epochs=10,
     patience=3,
@@ -86,6 +88,10 @@ def training(
     run_name=None,
     #
     extra_config=None,
+    requirements={},
+    log_leaderboard=True,
+    leaderboard_dir="leaderboard",
+    verbose=True,
     **_,
 ):
     """Build training config and run the full training loop.
@@ -109,6 +115,8 @@ def training(
         train_dl:  DataLoader for training data.
         valid_dl:  DataLoader for validation data.
         test_dl:   DataLoader for test data.
+        use_weighted_sampler: If True, use WeightedRandomSampler to handle class imbalance. Defaults to False.
+        train_labels: List or tensor of training labels. Required if use_weighted_sampler is True.
 
         epochs:              Number of training epochs.
         patience:            Early stopping patience in epochs.
@@ -132,6 +140,15 @@ def training(
         run_name:               Optional name for the run.
             
         extra_config:  Optional dict of additional config keys to merge.
+        requirements:  Optional client performance requirements dict, defaults to {}. 
+            Pass None to disable check. Keys:
+            - confidence_threshold: {"high": float, "medium": float} (values >1 treated as %)
+            - high_threshold: min fraction of predictions in high-confidence tier (default 0.70)
+            - fatal_accuracy: min recall on true fatal-class samples (default 0.95)
+            - f1_target: {class_index: min_f1} — use 0.0 to mark a class as having no target
+        log_leaderboard: Whether to append this run to the leaderboard CSV. Defaults to True.
+        leaderboard_dir: Directory for leaderboard.csv and owner.conf. Defaults to 'leaderboard'.
+        verbose: Enable printing the training loop message. Defaults to True.
 
     Returns:
         Run summary dictionary with history, best epoch, and best metric value.
@@ -157,6 +174,8 @@ def training(
         train_dl=train_dl,
         valid_dl=valid_dl,
         test_dl=test_dl,
+        use_weighted_sampler=use_weighted_sampler,
+        train_labels=train_labels,
         #
         epochs=epochs,
         patience=patience,
@@ -176,10 +195,15 @@ def training(
         #
         compute_train_metrics=compute_train_metrics,
         save=save,
-        save_dir=save_dir,
+        parent_dir=parent_dir,
         run_name=run_name,
         #
         extra_config=extra_config,
+        requirements=requirements,
     )
+
+    train_config["log_leaderboard"] = log_leaderboard
+    train_config["leaderboard_dir"] = leaderboard_dir
+    train_config["verbose"] = verbose
 
     return train_model_loop(train_config)

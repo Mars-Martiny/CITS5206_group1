@@ -1,6 +1,7 @@
 """Training configuration builder for the main training loop."""
 
 import time
+from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -8,6 +9,7 @@ import torch.optim as optim
 
 from .utility import _safe_class_name
 from .loss import get_loss_function
+from .imbalance import make_weighted_sampler
 
 
 # CONFIG AND UTILITY FUNCTIONS FOR TRAINING LOOP
@@ -30,6 +32,8 @@ def _build_train_config(
     train_dl,
     valid_dl,
     test_dl,
+    use_weighted_sampler,
+    train_labels,
     #
     epochs,
     patience,
@@ -53,6 +57,7 @@ def _build_train_config(
     run_name,
     #
     extra_config,
+    requirements,
 ):
     """Build the training configuration dictionary."""
     # Generate a timestamp for unique run identification and directory naming
@@ -63,7 +68,19 @@ def _build_train_config(
         lr = optimiser_args.get("lr", 1e-3) if optimiser_args else 1e-3
         optimiser = optim.Adam(model.parameters(), lr=lr)
 
-    if scheduler is None:
+
+    if use_weighted_sampler and train_labels is not None:
+        sampler = make_weighted_sampler(train_labels, num_classes=num_classes)
+        train_dl = torch.utils.data.DataLoader(
+            train_dl.dataset,
+            batch_size=train_dl.batch_size,
+            sampler=sampler,
+        )
+
+    # False means "no scheduler" (explicit opt-out); None means "use default"
+    if scheduler is False:
+        scheduler = None
+    elif scheduler is None:
         scheduler = optim.lr_scheduler.StepLR(optimiser, step_size=1, gamma=0.95)
 
     # LOSS FUNCTION // Get the loss function based on the specified type and weights
@@ -112,10 +129,12 @@ def _build_train_config(
         "scheduler_step_per_batch": scheduler_step_per_batch,
         #
         "criterion": criterion,
+        "criterion_type": criterion_type,
         #
         "train_dl": train_dl,
         "valid_dl": valid_dl,
         "test_dl": test_dl,
+        "use_weighted_sampler": use_weighted_sampler,
         #
         "epochs": epochs,
         "patience": patience,
@@ -138,6 +157,7 @@ def _build_train_config(
         #
         "parameters": parameters,
         "device": device,
+        "requirements": requirements,
         #
         "started_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "timestamp": timestamp,

@@ -180,7 +180,6 @@ def training(
     Returns:
         Run summary dictionary with history, best epoch, and best metric value.
     """
-    
     # All top-level inputs are collected into `config` and that config is passed everywhere else.
     # This keeps the function signatures clean and makes it easy to add new parameters without needing to change a lot of function signatures.
     train_config = _build_train_config(

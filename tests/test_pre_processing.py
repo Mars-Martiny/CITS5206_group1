@@ -152,15 +152,15 @@ class TestPreProcessDfNoLemmatize:
         result = proc.pre_process_df(df, "description")
         assert len(result) == 2
 
-    def test_drop_null_false_with_nulls_raises(self):
-        # Known limitation: drop_null=False does not guard against NaN in
-        # _basic_text_cleanup, so passing None values currently raises TypeError.
-        # If this test starts failing it means the bug has been fixed — update
-        # the test to assert correct behaviour (len(result) == 2) instead.
+    def test_drop_null_false_with_nulls_keeps_rows(self):
         proc = OneTextPreProcessor(lemmatize=False, drop_null=False, domain_terms={})
         df = pd.DataFrame({"description": ["valid", None]})
-        with pytest.raises(TypeError):
-            proc.pre_process_df(df, "description")
+
+        result = proc.pre_process_df(df, "description")
+
+        assert len(result) == 2
+
+        assert result["description_clean"].tolist() == ["valid", "none"]
 
     def test_column_rename(self):
         proc = OneTextPreProcessor(

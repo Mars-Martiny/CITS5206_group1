@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from collections import Counter
-from torch.utils.data import TensorDataset, DataLoader
+from torch.utils.data import Dataset, DataLoader
 
 
 class TFIDFVectorizer:
@@ -66,6 +66,76 @@ class TFIDFVectorizer:
                 vectors[doc_id, self.vocab[term]] = tf * idf
         return vectors
 
+    def transform_weighted_average_embeddings(
+        self,
+        tokenized_docs: list[list[str]],
+        *,
+        embedding_matrix: torch.Tensor,
+        eps: float = 1e-12,
+    ) -> torch.Tensor:
+        """Convert documents into dense vectors via TF-IDF-weighted embedding average.
+
+        This keeps the existing TF-IDF implementation intact and provides an
+        *optional* alternative representation:
+
+        doc_vec = sum(tfidf_score(word) * embed(word) for word in doc)
+         / sum(tfidf_score(word) for word in doc)
+
+        Where ``embed(w)`` is taken from ``embedding_matrix[self.vocab[w]]``.
+
+        Args:
+            tokenized_docs: List of tokenized documents.
+            embedding_matrix: A tensor aligned to ``self.vocab`` indices with
+                shape ``(vocab_size, embed_dim)`` (or larger in the first dim).
+            eps: Numerical stability constant for empty/degenerate docs.
+
+        Returns:
+            Dense document vectors of shape ``(num_docs, embed_dim)``.
+        """
+        if not hasattr(self, "vocab") or not hasattr(self, "df") or not hasattr(self, "N"):
+            raise ValueError("Vectorizer must be fit() before calling this method.")
+
+        if embedding_matrix.dim() != 2:
+            raise ValueError("embedding_matrix must be 2D: (vocab_size, embed_dim)")
+
+        embed_dim = int(embedding_matrix.shape[1])
+        device = embedding_matrix.device
+        out = torch.zeros(len(tokenized_docs), embed_dim, device=device)
+
+        for doc_id, doc in enumerate(tokenized_docs):
+            if not doc:
+                continue
+
+            counter = Counter(doc)
+            total = len(doc)
+            weighted_sum = torch.zeros(embed_dim, device=device)
+            weight_total = 0.0
+
+            for term in np.unique(doc):
+                v_idx = self.vocab.get(term)
+                if v_idx is None:
+                    continue
+                if v_idx >= embedding_matrix.shape[0]:
+                    continue
+
+                tf = counter[term] / total
+                idf = math.log(self.N / (self.df[term] + 1)) + 1
+                w = float(tf * idf)
+                if w <= 0.0:
+                    continue
+
+                weighted_sum += embedding_matrix[v_idx] * w
+                weight_total += w
+
+            # # Using IDF did not work:
+            # out[doc_id] = weighted_sum / max(weight_total, eps)
+            # # L2 Norm did not work
+            # norm = weighted_sum.norm(p=2)
+            # out[doc_id] = weighted_sum / max(float(norm), eps)
+            out[doc_id] = weighted_sum
+
+        return out
+
 
 class TFIDFClassifier(nn.Module):
     """Feed-forward classifier that operates on TF-IDF feature vectors.
@@ -106,6 +176,18 @@ class TFIDFClassifier(nn.Module):
         return self.net(x.float())
 
 
+class _TFIDFDataset(Dataset):
+    def __init__(self, tfidf_vectors: torch.Tensor, labels: torch.Tensor):
+        self.tfidf_vectors = tfidf_vectors
+        self.labels = labels
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, idx):
+        return {"input_ids": self.tfidf_vectors[idx], "label": self.labels[idx]}
+
+
 def build_tfidf_dataloader(
     tfidf_vectors: torch.Tensor,
     labels: torch.Tensor,
@@ -114,9 +196,8 @@ def build_tfidf_dataloader(
 ) -> DataLoader:
     """Wraps TF-IDF vectors and labels in a DataLoader.
 
-    Produces batches in the ``(D, DL, Energy, Risk)`` format expected by the
-    shared training loop. The ``DL`` and ``Energy`` slots are filled with
-    zero-valued placeholder tensors.
+    Returns dict-style batches with keys ``input_ids`` and ``label``,
+    compatible with the ``_unpack_batch`` dict branch in the training loop.
 
     Args:
         tfidf_vectors: Float tensor of shape ``(num_samples, vocab_size)``
@@ -127,9 +208,7 @@ def build_tfidf_dataloader(
         shuffle: Whether to shuffle the dataset each epoch. Defaults to True.
 
     Returns:
-        A DataLoader yielding 4-tuples of
-        ``(tfidf_vectors, dummy_dl, labels, dummy_energy)``.
+        A DataLoader yielding dicts of ``{"input_ids": ..., "label": ...}``.
     """
-    dummy = torch.zeros(len(tfidf_vectors), dtype=torch.long)  # placeholder DL
-    dataset = TensorDataset(tfidf_vectors, dummy, labels, dummy)
+    dataset = _TFIDFDataset(tfidf_vectors, labels)
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)

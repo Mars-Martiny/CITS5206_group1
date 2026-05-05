@@ -77,9 +77,15 @@ def _unpack_batch(batch, config):
     device = config["device"]
 
     if isinstance(batch, dict):
+        targets = batch["label"].to(device)
+
+        if "attention_mask" not in batch:
+            # TF-IDF style: single feature tensor, no attention mask
+            logits = config["model"](batch["input_ids"].to(device))
+            return logits, targets
+
         input_ids = batch["input_ids"].to(device)
         attention_mask = batch["attention_mask"].to(device)
-        targets = batch["label"].to(device)
 
         token_type_ids = batch.get("token_type_ids")
         if token_type_ids is not None:

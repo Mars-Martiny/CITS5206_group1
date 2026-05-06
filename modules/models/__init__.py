@@ -1,3 +1,10 @@
-"""Model module exposing feature extractors and classifiers."""
+"""Model architectures and wrappers used by the project."""
+from .bilstm_feature_extractor import BiLSTMFeatureExtractor
+from .feature_classifier_wrapper import FeatureClassifierWrapper
 from .svm_classifier import SVMClassifierWrapper
-"""Model architectures used by the project."""
+
+__all__ = [
+    "BiLSTMFeatureExtractor",
+    "FeatureClassifierWrapper",
+    "SVMClassifierWrapper",
+]

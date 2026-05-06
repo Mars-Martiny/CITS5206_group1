@@ -46,6 +46,6 @@ def test_feature_pipeline():
         target="energy",
     )
 
-    assert "all_preds" in result
-    assert "all_targets" in result
-    assert "all_probs" in result
+    assert "predictions" in result
+    assert "targets" in result
+    assert "probabilities" in result

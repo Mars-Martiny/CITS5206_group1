@@ -10,6 +10,7 @@ import torch.optim as optim
 from .utility import _safe_class_name
 from .loss import get_loss_function
 from .imbalance import make_weighted_sampler
+from .optimizer import create_optimizer, normalise_optimizer_config
 
 
 # CONFIG AND UTILITY FUNCTIONS FOR TRAINING LOOP
@@ -63,11 +64,17 @@ def _build_train_config(
     # Generate a timestamp for unique run identification and directory naming
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # DEFAULT OPTIMISER, SCHEDULER, CRITERION // Set default optimiser, scheduler, and criterion if not provided
-    if optimiser is None:
-        lr = optimiser_args.get("lr", 1e-3) if optimiser_args else 1e-3
-        optimiser = optim.Adam(model.parameters(), lr=lr)
+    # Added optimizer configuration handling to support flexible input formats (string, dict, or custom object)
+    optimizer_config = normalise_optimizer_config(
+        optimiser=optimiser,
+        optimiser_args=optimiser_args,
+    )
 
+    optimiser = create_optimizer(
+        parameters=model.parameters(),
+        optimizer_config=optimizer_config,
+        optimizer_object=optimiser if not isinstance(optimiser, (str, dict, type(None))) else None,
+    )
 
     if use_weighted_sampler and train_labels is not None:
         sampler = make_weighted_sampler(train_labels, num_classes=num_classes)

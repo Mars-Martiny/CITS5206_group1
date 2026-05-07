@@ -111,9 +111,9 @@ def _build_train_config(
 
     # Derive save_name from run_name or model_type
     if run_name:
-        save_name = run_name.lower().replace(" ", "_")[:10]
+        save_name = run_name.lower().replace(" ", "_")
     else:
-        save_name = model_type.lower().replace(" ", "_")[:10]
+        save_name = model_type.lower().replace(" ", "_")
         run_name = f"{save_name}_run_{timestamp}"
 
     # BUILD CONFIG DICTIONARY // Build the configuration dictionary with all training parameters and metadata

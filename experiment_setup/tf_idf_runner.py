@@ -253,6 +253,7 @@ def tf_idf_train(
         optimiser=optimiser,
         scheduler=scheduler,
         requirements=requirements,
+        class_dict=label_enc.id_to_label,
         **cfg,
     )
 

@@ -68,7 +68,11 @@ class BiGRUClassifier(nn.Module):
         """Compute class logits for a batch of padded token sequences.
 
         Args:
-            x: Long tensor of shape ``(batch_size, max_seq_len)``.
+            x: Either a Long tensor of shape ``(batch_size, max_seq_len)`` for
+                vocabulary-index input (static embeddings), or a Float tensor of
+                shape ``(batch_size, max_seq_len, embedding_dim)`` containing
+                pre-computed contextual embeddings (e.g. from BERT). The dtype
+                is used to distinguish the two cases.
             lengths: Optional long tensor of shape ``(batch_size,)`` with the
                 unpadded length of each sequence. When provided, packed sequences
                 are used so the GRU skips padding tokens.
@@ -76,7 +80,11 @@ class BiGRUClassifier(nn.Module):
         Returns:
             Logit tensor of shape ``(batch_size, num_classes)``.
         """
-        embeds = self.dropout(self.word_embeddings(x))
+        # Float input = pre-computed contextual embeddings; skip the lookup.
+        if x.dtype == torch.long:
+            embeds = self.dropout(self.word_embeddings(x))
+        else:
+            embeds = self.dropout(x)
 
         if lengths is not None:
             packed = pack_padded_sequence(

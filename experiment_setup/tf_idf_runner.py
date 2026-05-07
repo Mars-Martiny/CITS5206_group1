@@ -148,6 +148,7 @@ def tf_idf_train(
     test_labels,
     energy_model,
     train_config=None,
+    requirements={}
 ):
     """Train a TF-IDF classifier.
 
@@ -180,7 +181,12 @@ def tf_idf_train(
 
             All other keys are passed verbatim as keyword arguments to
             ``training()``, overriding the defaults in ``_TFIDF_TRAIN_DEFAULTS``.
-
+        requirements:  Optional client performance requirements dict, defaults to {}. 
+            Pass None to disable check. Keys:
+            - confidence_threshold: {"high": float, "medium": float} (values >1 treated as %)
+            - high_threshold: min fraction of predictions in high-confidence tier (default 0.70)
+            - fatal_accuracy: min recall on true fatal-class samples (default 0.95)
+            - f1_target: {class_index: min_f1} — use 0.0 to mark a class as having no target
     Returns:
         dict: The result dictionary returned by `training()`.
     """
@@ -246,6 +252,7 @@ def tf_idf_train(
         num_classes=num_classes,
         optimiser=optimiser,
         scheduler=scheduler,
+        requirements=requirements,
         **cfg,
     )
 
@@ -254,6 +261,7 @@ def tf_idf_run_single(
     train_df, valid_df, test_df, text_col,
     energy_model=True, keep_numbers=False, lemma_config={},
     train_config=None,
+    requirements={}
 ):
     """Run one end-to-end TF-IDF experiment on a single split.
 
@@ -271,6 +279,12 @@ def tf_idf_run_single(
         lemma_config: Optional configuration enabling lemmatization.
         train_config: Optional training configuration overrides (see
             `tf_idf_train`).
+        requirements:  Optional client performance requirements dict, defaults to {}. 
+            Pass None to disable check. Keys:
+            - confidence_threshold: {"high": float, "medium": float} (values >1 treated as %)
+            - high_threshold: min fraction of predictions in high-confidence tier (default 0.70)
+            - fatal_accuracy: min recall on true fatal-class samples (default 0.95)
+            - f1_target: {class_index: min_f1} — use 0.0 to mark a class as having no target
 
     Returns:
         dict: The result dictionary returned by `training()`.
@@ -279,13 +293,14 @@ def tf_idf_run_single(
         train_df, valid_df, test_df, text_col, keep_numbers, lemma_config
     )
     encoded = tf_idf_encode(df_train, df_valid, df_test, text_col, lemma_config, energy_model)
-    return tf_idf_train(*encoded, train_config=train_config)
+    return tf_idf_train(*encoded, train_config=train_config, requirements=requirements)
 
 
 def tf_idf_run_multiple(
     train_df, valid_df, test_df, text_col,
     keep_numbers=False, lemma_config={}, energy_model=True, n=5,
     train_config=None,
+    requirements = {}
 ):
     """Run multiple TF-IDF training runs on the same processed split.
 
@@ -304,7 +319,12 @@ def tf_idf_run_multiple(
         n: Number of runs to execute.
         train_config: Optional training configuration overrides (see
             `tf_idf_train`).
-
+        requirements:  Optional client performance requirements dict, defaults to {}. 
+            Pass None to disable check. Keys:
+            - confidence_threshold: {"high": float, "medium": float} (values >1 treated as %)
+            - high_threshold: min fraction of predictions in high-confidence tier (default 0.70)
+            - fatal_accuracy: min recall on true fatal-class samples (default 0.95)
+            - f1_target: {class_index: min_f1} — use 0.0 to mark a class as having no target
     Returns:
         list[dict]: A list of result dictionaries returned by `training()`.
     """
@@ -312,13 +332,13 @@ def tf_idf_run_multiple(
         train_df, valid_df, test_df, text_col, keep_numbers, lemma_config
     )
     encoded = tf_idf_encode(df_train, df_valid, df_test, text_col, lemma_config, energy_model)
-    return [tf_idf_train(*encoded, train_config=train_config) for _ in range(n)]
+    return [tf_idf_train(*encoded, train_config=train_config, requirements=requirements) for _ in range(n)]
 
 
 def tf_idf_hparam_search(
     train_df, valid_df, test_df, text_col,
     keep_numbers=False, lemma_config={}, energy_model=True,
-    n_trials=40, timeout=None,
+    n_trials=40, timeout=None, requirements= {}
 ):
     """Run Optuna hyperparameter search over lr, hidden_dim, epochs, and scheduler.
 
@@ -337,7 +357,12 @@ def tf_idf_hparam_search(
             `potential_damage`.
         n_trials:  Maximum number of Optuna trials.
         timeout:   Stop after this many seconds regardless of n_trials (None = no limit).
-
+        requirements:  Optional client performance requirements dict, defaults to {}. 
+            Pass None to disable check. Keys:
+            - confidence_threshold: {"high": float, "medium": float} (values >1 treated as %)
+            - high_threshold: min fraction of predictions in high-confidence tier (default 0.70)
+            - fatal_accuracy: min recall on true fatal-class samples (default 0.95)
+            - f1_target: {class_index: min_f1} — use 0.0 to mark a class as having no target
     Returns:
         optuna.Study — inspect with study.best_params, study.best_value,
         and optuna.visualization helpers.
@@ -393,7 +418,7 @@ def tf_idf_hparam_search(
             # "feature_representation": "tfidf_embed_avg",
             # "embedding_model_name": "adanish91/safetybert",
         }
-        result = tf_idf_train(*encoded, train_config=cfg)
+        result = tf_idf_train(*encoded, train_config=cfg, requirements=requirements)
         return result["best_metric_value"]
 
     study = optuna.create_study(direction="maximize", study_name="tf_idf_hparam_search")

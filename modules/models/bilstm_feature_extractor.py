@@ -7,35 +7,11 @@ from torch.nn.utils.rnn import pack_padded_sequence
 
 class BiLSTMFeatureExtractor(nn.Module):
     """Extract feature vectors from token sequences using a BiLSTM."""
-
-    def __init__(
-        self,
-        vocab_size: int,
-        embedding_dim: int,
-        hidden_dim: int,
-        num_layers: int = 1,
-        dropout: float = 0.3,
-        padding_idx: int = 0,
-    ):
-        """Initialize the BiLSTM feature extractor."""
+    def __init__(self, bilstm_model):
         super().__init__()
-
-        self.embedding = nn.Embedding(
-            num_embeddings=vocab_size,
-            embedding_dim=embedding_dim,
-            padding_idx=padding_idx,
-        )
-
-        self.lstm = nn.LSTM(
-            input_size=embedding_dim,
-            hidden_size=hidden_dim,
-            num_layers=num_layers,
-            batch_first=True,
-            bidirectional=True,
-            dropout=dropout if num_layers > 1 else 0.0,
-        )
-
-        self.dropout = nn.Dropout(dropout)
+        self.embedding = bilstm_model.embedding
+        self.lstm = bilstm_model.lstm
+        self.dropout = bilstm_model.dropout
 
     def forward(self, D: torch.Tensor, DL: torch.Tensor | None = None) -> torch.Tensor:
         """Extract BiLSTM feature vectors."""

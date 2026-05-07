@@ -15,6 +15,7 @@
 
 # %%
 import pandas as pd
+from implementations.bilstm import run_bilstm_training
 
 # %%
 ## Need to install contractions. Need to list this!
@@ -46,8 +47,8 @@ lemma_config = {
 }
 
 # %%
-import torch
-from experiment_setup.tf_idf_runner import tf_idf_run_multiple, tf_idf_hparam_search
+# import torch  # Not needed when running BiLSTM only
+# from experiment_setup.tf_idf_runner import tf_idf_run_multiple, tf_idf_hparam_search  # Disabled for BiLSTM-only run
 def pre_process(data_path):
     oneTextPreProcessor = OneTextPreProcessor(keep_numbers=False, column_map=column_map)
     proc_df = oneTextPreProcessor.pre_process_df(
@@ -60,126 +61,213 @@ model1_train = pre_process("dataset/model1_train.csv")
 model1_valid = pre_process("dataset/model1_valid.csv")
 model1_test = pre_process("dataset/model1_test.csv")
 
+
+from implementations.bilstm import prepare_bilstm_dataloaders
+from modules.models import BiLSTMClassifier, BiLSTMFeatureExtractor, SVMClassifierWrapper
+from pipeline.run_feature_inference import run_feature_pipeline
+import torch
+
+print("Starting BiLSTM training...")
+
+bilstm_result = run_bilstm_training(
+    train_df=model1_train,
+    valid_df=model1_valid,
+    test_df=model1_test,
+
+    tokens_col="description_tokens_lemma",
+    label_col="energy_type",
+
+    embedding_dim=64,
+    hidden_dim=64,
+    dropout=0.5,
+
+    epochs=50,
+    patience=5,
+
+    best_metric="f1_macro",
+)
+
+bilstm_model_path = (
+    bilstm_result.get("model_path")
+    or str(
+        bilstm_result["config"]["save_dir"]
+        / f"{bilstm_result['config']['save_name']}_model.pt"
+    )
+)
+
+print("Using trained BiLSTM model:", bilstm_model_path)
+print("Starting SVM + trained BiLSTM feature extractor training...")
+
+train_dl, valid_dl, test_dl, bilstm_metadata = prepare_bilstm_dataloaders(
+    train_df=model1_train,
+    valid_df=model1_valid,
+    test_df=model1_test,
+    tokens_col="description_tokens_lemma",
+    label_col="energy_type",
+)
+
+bilstm_model = BiLSTMClassifier(
+    vocab_size=bilstm_metadata["vocab_encoder"].vocab_size,
+    embedding_dim=64,
+    hidden_dim=64,
+    num_classes=bilstm_metadata["label_encoder"].num_classes,
+    dropout=0.5,
+)
+
+bilstm_model.load_state_dict(
+    torch.load(
+        bilstm_model_path,
+        map_location="cpu",
+    )
+)
+
+feature_extractor = BiLSTMFeatureExtractor(bilstm_model)
+
+classifier = SVMClassifierWrapper(
+    kernel="linear",
+    C=1.0,
+    probability=True,
+)
+
+svm_result = run_feature_pipeline(
+    feature_extractor=feature_extractor,
+    classifier=classifier,
+    train_dl=train_dl,
+    test_dl=test_dl,
+    target="energy",
+    model_type="SVM_BiLSTM_Features",
+    run_name="real_svm_bilstm",
+)
+
+print(svm_result["metrics"])
+
+# -----------------------------------------------------------------------------
+# The remaining original experiment blocks are commented out for this run.
+# This keeps main_notebook.py focused on TWO real-data runs:
+# 1) pure BiLSTM and 2) SVM using the trained BiLSTM feature extractor.
+# It does not also train TF-IDF / Optuna / BERT / BiGRU.
+# -----------------------------------------------------------------------------
 # model2_train = pre_process("dataset/model2_train.csv")
 # model2_valid = pre_process("dataset/model2_valid.csv")
 # model2_test = pre_process("dataset/model2_test.csv")
 
 # %%
-model1_train["energy_type"].value_counts()
+# model1_train["energy_type"].value_counts()
 
-train_df = pd.read_csv("dataset/model1_train.csv")
-valid_df = pd.read_csv("dataset/model1_valid.csv")
-test_df = pd.read_csv("dataset/model1_test.csv")
+# train_df = pd.read_csv("dataset/model1_train.csv")
+# valid_df = pd.read_csv("dataset/model1_valid.csv")
+# test_df = pd.read_csv("dataset/model1_test.csv")
 
-text_col = column_map["Detailed Description of Event"]         # "description"
+# text_col = column_map["Detailed Description of Event"]         # "description"
 
-_EPOCHS = 100
+# _EPOCHS = 100
 
 # Baseline: plain TF-IDF features (current default)
-tfidf_train_config = {
-    "epochs": _EPOCHS,
-    "patience": 12,
-    "best_metric": "f1_macro",
-    # Optimizer factory — receives the model after it is built inside the runner
-    "optimizer_fn": lambda model: torch.optim.Adam(model.parameters(), lr=1e-3),
-    # CosineAnnealingLR: lr decays from initial to eta_min over T_max epochs
-    "scheduler_fn": lambda opt: torch.optim.lr_scheduler.CosineAnnealingLR(
-        opt, T_max=_EPOCHS, eta_min=1e-6
-    ),
-    "scheduler_step_per_batch": False,
-}
+# tfidf_train_config = {
+#     "epochs": _EPOCHS,
+#     "patience": 12,
+#     "best_metric": "f1_macro",
+#     # Optimizer factory — receives the model after it is built inside the runner
+#     "optimizer_fn": lambda model: torch.optim.Adam(model.parameters(), lr=1e-3),
+#     # CosineAnnealingLR: lr decays from initial to eta_min over T_max epochs
+#     "scheduler_fn": lambda opt: torch.optim.lr_scheduler.CosineAnnealingLR(
+#         opt, T_max=_EPOCHS, eta_min=1e-6
+#     ),
+#     "scheduler_step_per_batch": False,
+# }
 
-models = tf_idf_run_multiple(
-    train_df, valid_df, test_df, text_col,
-    keep_numbers=False, lemma_config=lemma_config,
-    energy_model=True, n=5,
-    train_config=tfidf_train_config,
-text_col = column_map["Detailed Description of Event"]         # "description"
-label_col = "energy_type"  # or "Potential Damage" for model2
+# models = tf_idf_run_multiple(
+#     train_df, valid_df, test_df, text_col,
+#     keep_numbers=False, lemma_config=lemma_config,
+#     energy_model=True, n=5,
+#     train_config=tfidf_train_config,
+# )
+# text_col = column_map["Detailed Description of Event"]         # "description"
+# label_col = "energy_type"  # or "Potential Damage" for model2
 
-train_tokenized_docs = model1_train[tokens_col].tolist()
-val_tokenized_docs   = model1_valid[tokens_col].tolist()
-test_tokenized_docs  = model1_test[tokens_col].tolist()
+# train_tokenized_docs = model1_train[tokens_col].tolist()
+# val_tokenized_docs   = model1_valid[tokens_col].tolist()
+# test_tokenized_docs  = model1_test[tokens_col].tolist()
 
-label_enc = LabelEncoder()
-label_enc.fit(model1_train[label_col].tolist())
+# label_enc = LabelEncoder()
+# label_enc.fit(model1_train[label_col].tolist())
 
-train_labels = torch.tensor(label_enc.encode_many(model1_train[label_col].tolist()))
-val_labels   = torch.tensor(label_enc.encode_many(model1_valid[label_col].tolist()))
-test_labels  = torch.tensor(label_enc.encode_many(model1_test[label_col].tolist()))
+# train_labels = torch.tensor(label_enc.encode_many(model1_train[label_col].tolist()))
+# val_labels   = torch.tensor(label_enc.encode_many(model1_valid[label_col].tolist()))
+# test_labels  = torch.tensor(label_enc.encode_many(model1_test[label_col].tolist()))
 
 # --- TF-IDF ---
-vectorizer = TFIDFVectorizer().fit(train_tokenized_docs)
-train_vecs = vectorizer.transform(train_tokenized_docs)
-val_vecs   = vectorizer.transform(val_tokenized_docs)
-test_vecs  = vectorizer.transform(test_tokenized_docs)
+# vectorizer = TFIDFVectorizer().fit(train_tokenized_docs)
+# train_vecs = vectorizer.transform(train_tokenized_docs)
+# val_vecs   = vectorizer.transform(val_tokenized_docs)
+# test_vecs  = vectorizer.transform(test_tokenized_docs)
 
-train_dl = build_tfidf_dataloader(train_vecs, train_labels)
-val_dl   = build_tfidf_dataloader(val_vecs, val_labels, shuffle=False)
-test_dl  = build_tfidf_dataloader(test_vecs, test_labels, shuffle=False)
+# train_dl = build_tfidf_dataloader(train_vecs, train_labels)
+# val_dl   = build_tfidf_dataloader(val_vecs, val_labels, shuffle=False)
+# test_dl  = build_tfidf_dataloader(test_vecs, test_labels, shuffle=False)
 
-num_classes = label_enc.num_classes
-model = TFIDFClassifier(vocab_size=len(vectorizer.vocab), num_classes=num_classes, hidden_dim=256)
-device = "cuda" if torch.cuda.is_available() else "cpu"
-model = model.to(device)
+# num_classes = label_enc.num_classes
+# model = TFIDFClassifier(vocab_size=len(vectorizer.vocab), num_classes=num_classes, hidden_dim=256)
+# device = "cuda" if torch.cuda.is_available() else "cpu"
+# model = model.to(device)
 
-results = training(
-    model_type="tf_idf",
-    model=model,
-    train_dl=train_dl,
-    valid_dl=val_dl,
-    test_dl=test_dl,
-    epochs=100,
-    device=device,
-    patience=12,
-    criterion_weights=None,
-    best_metric="f1_macro",
-    need_length=False,
-    energy_model=True,
-    num_classes=num_classes,
-    requirements={
-        "confidence_threshold": {"high": 0.80, "medium": 0.50},
-        "high_threshold": 0.70,
-        "fatal_accuracy": 0.95,
-        "f1_target": {5: 0.70, 6: 0.70, 11: 0.70, 17: 0.70, 0:0.0}, # Class 0 (Animal) no target
-    }
-)
+# results = training(
+#     model_type="tf_idf",
+#     model=model,
+#     train_dl=train_dl,
+#     valid_dl=val_dl,
+#     test_dl=test_dl,
+#     epochs=100,
+#     device=device,
+#     patience=12,
+#     criterion_weights=None,
+#     best_metric="f1_macro",
+#     need_length=False,
+#     energy_model=True,
+#     num_classes=num_classes,
+#     requirements={
+#         "confidence_threshold": {"high": 0.80, "medium": 0.50},
+#         "high_threshold": 0.70,
+#         "fatal_accuracy": 0.95,
+#         "f1_target": {5: 0.70, 6: 0.70, 11: 0.70, 17: 0.70, 0:0.0}, # Class 0 (Animal) no target
+#     }
+# )
 
 # %%
-from sklearn.metrics import classification_report
+# from sklearn.metrics import classification_report
 
-model = results["config"]["model"]
-valid_dl = results["config"]["valid_dl"]
-device = results["config"]["device"]
+# model = results["config"]["model"]
+# valid_dl = results["config"]["valid_dl"]
+# device = results["config"]["device"]
 
-train_df = pd.read_csv("dataset/model1_train.csv")
-valid_df = pd.read_csv("dataset/model1_valid.csv")
-test_df = pd.read_csv("dataset/model1_test.csv")
+# train_df = pd.read_csv("dataset/model1_train.csv")
+# valid_df = pd.read_csv("dataset/model1_valid.csv")
+# test_df = pd.read_csv("dataset/model1_test.csv")
 
-text_col = column_map["Detailed Description of Event"]         # "description"
+# text_col = column_map["Detailed Description of Event"]         # "description"
 
-_EPOCHS = 100
+# _EPOCHS = 100
 
 # Baseline: plain TF-IDF features (current default)
-tfidf_train_config = {
-    "epochs": _EPOCHS,
-    "patience": 12,
-    "best_metric": "f1_macro",
-    # Optimizer factory — receives the model after it is built inside the runner
-    "optimizer_fn": lambda model: torch.optim.Adam(model.parameters(), lr=1e-3),
-    # CosineAnnealingLR: lr decays from initial to eta_min over T_max epochs
-    "scheduler_fn": lambda opt: torch.optim.lr_scheduler.CosineAnnealingLR(
-        opt, T_max=_EPOCHS, eta_min=1e-6
-    ),
-    "scheduler_step_per_batch": False,
-}
+# tfidf_train_config = {
+#     "epochs": _EPOCHS,
+#     "patience": 12,
+#     "best_metric": "f1_macro",
+#     # Optimizer factory — receives the model after it is built inside the runner
+#     "optimizer_fn": lambda model: torch.optim.Adam(model.parameters(), lr=1e-3),
+#     # CosineAnnealingLR: lr decays from initial to eta_min over T_max epochs
+#     "scheduler_fn": lambda opt: torch.optim.lr_scheduler.CosineAnnealingLR(
+#         opt, T_max=_EPOCHS, eta_min=1e-6
+#     ),
+#     "scheduler_step_per_batch": False,
+# }
 
-models = tf_idf_run_multiple(
-    train_df, valid_df, test_df, text_col,
-    keep_numbers=False, lemma_config=lemma_config,
-    energy_model=True, n=5,
-    train_config=tfidf_train_config,
-)
+# models = tf_idf_run_multiple(
+#     train_df, valid_df, test_df, text_col,
+#     keep_numbers=False, lemma_config=lemma_config,
+#     energy_model=True, n=5,
+#     train_config=tfidf_train_config,
+# )
 
 # %%
 # models
@@ -190,121 +278,121 @@ models = tf_idf_run_multiple(
 # Pre-processing runs once before the study; each trial trains a fresh model.
 
 # %%
-hparam_study = tf_idf_hparam_search(
-    train_df, valid_df, test_df, text_col,
-    keep_numbers=False, lemma_config=lemma_config,
-    energy_model=True,
-    n_trials=40,
-    timeout=None,   # set to seconds e.g. 3600 to cap wall time
-)
+# hparam_study = tf_idf_hparam_search(
+#     train_df, valid_df, test_df, text_col,
+#     keep_numbers=False, lemma_config=lemma_config,
+#     energy_model=True,
+#     n_trials=40,
+#     timeout=None,   # set to seconds e.g. 3600 to cap wall time
+# )
 
-print("Best val f1_macro :", hparam_study.best_value)
-print("Best params       :", hparam_study.best_params)
+# print("Best val f1_macro :", hparam_study.best_value)
+# print("Best params       :", hparam_study.best_params)
 
 # %%
 # Visualise results — requires plotly: pip install plotly
-import optuna
+# import optuna
 
-optuna.visualization.plot_optimization_history(hparam_study).show()
-optuna.visualization.plot_param_importances(hparam_study).show()
-optuna.visualization.plot_parallel_coordinate(hparam_study).show()
+# optuna.visualization.plot_optimization_history(hparam_study).show()
+# optuna.visualization.plot_param_importances(hparam_study).show()
+# optuna.visualization.plot_parallel_coordinate(hparam_study).show()
 
 # %%
 # Retrain n times with the best found params
-best = hparam_study.best_params
-_BEST_EPOCHS = best["epochs"]
+# best = hparam_study.best_params
+# _BEST_EPOCHS = best["epochs"]
 
-best_train_config = {
-    "epochs": _BEST_EPOCHS,
-    "hidden_dim": best["hidden_dim"],
-    "patience": 15,
-    "best_metric": "f1_macro",
-    "optimizer_fn": lambda model: torch.optim.Adam(model.parameters(), lr=best["lr"]),
-    "scheduler_fn": lambda opt: (
-        torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=_BEST_EPOCHS, eta_min=1e-6)
-        if best["scheduler"] == "cosine"
-        else torch.optim.lr_scheduler.StepLR(opt, step_size=max(1, _BEST_EPOCHS // 5), gamma=0.5)
-        if best["scheduler"] == "step"
-        else None
-    ),
-    "scheduler_step_per_batch": False,
-}
+# best_train_config = {
+#     "epochs": _BEST_EPOCHS,
+#     "hidden_dim": best["hidden_dim"],
+#     "patience": 15,
+#     "best_metric": "f1_macro",
+#     "optimizer_fn": lambda model: torch.optim.Adam(model.parameters(), lr=best["lr"]),
+#     "scheduler_fn": lambda opt: (
+#         torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=_BEST_EPOCHS, eta_min=1e-6)
+#         if best["scheduler"] == "cosine"
+#         else torch.optim.lr_scheduler.StepLR(opt, step_size=max(1, _BEST_EPOCHS // 5), gamma=0.5)
+#         if best["scheduler"] == "step"
+#         else None
+#     ),
+#     "scheduler_step_per_batch": False,
+# }
 
-best_models = tf_idf_run_multiple(
-    train_df, valid_df, test_df, text_col,
-    keep_numbers=False, lemma_config=lemma_config,
-    energy_model=True, n=5,
-    train_config=best_train_config,
-)
+# best_models = tf_idf_run_multiple(
+#     train_df, valid_df, test_df, text_col,
+#     keep_numbers=False, lemma_config=lemma_config,
+#     energy_model=True, n=5,
+#     train_config=best_train_config,
+# )
 
 # %% [markdown]
 # # Search for TF-IDF Potential Damage Model
 
 # %%
-train_df = pd.read_csv("dataset/model2_train.csv")
-valid_df = pd.read_csv("dataset/model2_valid.csv")
-test_df = pd.read_csv("dataset/model2_test.csv")
+# train_df = pd.read_csv("dataset/model2_train.csv")
+# valid_df = pd.read_csv("dataset/model2_valid.csv")
+# test_df = pd.read_csv("dataset/model2_test.csv")
 
 # %%
-valid_df["Type of Potential Damage"].value_counts()
+# valid_df["Type of Potential Damage"].value_counts()
 
 # %%
-train_df = pd.read_csv("dataset/model2_train.csv")
-valid_df = pd.read_csv("dataset/model2_valid.csv")
-test_df = pd.read_csv("dataset/model2_test.csv")
+# train_df = pd.read_csv("dataset/model2_train.csv")
+# valid_df = pd.read_csv("dataset/model2_valid.csv")
+# test_df = pd.read_csv("dataset/model2_test.csv")
 
-hparam_study = tf_idf_hparam_search(
-    train_df, valid_df, test_df, text_col,
-    keep_numbers=False, lemma_config=lemma_config,
-    energy_model=False,
-    n_trials=40,
-    timeout=None,   # set to seconds e.g. 3600 to cap wall time
-)
+# hparam_study = tf_idf_hparam_search(
+#     train_df, valid_df, test_df, text_col,
+#     keep_numbers=False, lemma_config=lemma_config,
+#     energy_model=False,
+#     n_trials=40,
+#     timeout=None,   # set to seconds e.g. 3600 to cap wall time
+# )
 
-print("Best val f1_macro :", hparam_study.best_value)
-print("Best params       :", hparam_study.best_params)
+# print("Best val f1_macro :", hparam_study.best_value)
+# print("Best params       :", hparam_study.best_params)
 # Visualise results — requires plotly: pip install plotly
-import optuna
+# import optuna
 
-optuna.visualization.plot_optimization_history(hparam_study).show()
-optuna.visualization.plot_param_importances(hparam_study).show()
-optuna.visualization.plot_parallel_coordinate(hparam_study).show()
+# optuna.visualization.plot_optimization_history(hparam_study).show()
+# optuna.visualization.plot_param_importances(hparam_study).show()
+# optuna.visualization.plot_parallel_coordinate(hparam_study).show()
 # Retrain n times with the best found params
-best = hparam_study.best_params
-_BEST_EPOCHS = best["epochs"]
+# best = hparam_study.best_params
+# _BEST_EPOCHS = best["epochs"]
 
-best_train_config = {
-    "epochs": _BEST_EPOCHS,
-    "hidden_dim": best["hidden_dim"],
-    "patience": 15,
-    "best_metric": "f1_macro",
-    "optimizer_fn": lambda model: torch.optim.Adam(model.parameters(), lr=best["lr"]),
-    "scheduler_fn": lambda opt: (
-        torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=_BEST_EPOCHS, eta_min=1e-6)
-        if best["scheduler"] == "cosine"
-        else torch.optim.lr_scheduler.StepLR(opt, step_size=max(1, _BEST_EPOCHS // 5), gamma=0.5)
-        if best["scheduler"] == "step"
-        else None
-    ),
-    "scheduler_step_per_batch": False,
-}
+# best_train_config = {
+#     "epochs": _BEST_EPOCHS,
+#     "hidden_dim": best["hidden_dim"],
+#     "patience": 15,
+#     "best_metric": "f1_macro",
+#     "optimizer_fn": lambda model: torch.optim.Adam(model.parameters(), lr=best["lr"]),
+#     "scheduler_fn": lambda opt: (
+#         torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=_BEST_EPOCHS, eta_min=1e-6)
+#         if best["scheduler"] == "cosine"
+#         else torch.optim.lr_scheduler.StepLR(opt, step_size=max(1, _BEST_EPOCHS // 5), gamma=0.5)
+#         if best["scheduler"] == "step"
+#         else None
+#     ),
+#     "scheduler_step_per_batch": False,
+# }
 
-best_models = tf_idf_run_multiple(
-    train_df, valid_df, test_df, text_col,
-    keep_numbers=False, lemma_config=lemma_config,
-    energy_model=False, n=5,
-    train_config=best_train_config,
-)
+# best_models = tf_idf_run_multiple(
+#     train_df, valid_df, test_df, text_col,
+#     keep_numbers=False, lemma_config=lemma_config,
+#     energy_model=False, n=5,
+#     train_config=best_train_config,
+# )
 
 # %%
-from transformers import AutoTokenizer, AutoModel, AutoModelForMaskedLM
-import torch
-import numpy as np
+# from transformers import AutoTokenizer, AutoModel, AutoModelForMaskedLM
+# import torch
+# import numpy as np
 
 # %%
 # ── Load once, reuse for both extraction methods ──────────────────────────────
-tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-safety_bert = AutoModel.from_pretrained("adanish91/safetybert")
+# tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+# safety_bert = AutoModel.from_pretrained("adanish91/safetybert")
 
 
 # %%
@@ -313,37 +401,37 @@ safety_bert = AutoModel.from_pretrained("adanish91/safetybert")
 # Pull the raw embedding weight matrix — shape: (vocab_size=30522, hidden=768)
 # This is a direct lookup table, no context.
 # ─────────────────────────────────────────────────────────────────────────────
-def get_embedding_matrix(vocab: dict[str, int]) -> torch.Tensor:
-    """
-    Build an embedding matrix aligned to vocabulary (NEEDS {word: index} dictionary)
+# def get_embedding_matrix(vocab: dict[str, int]) -> torch.Tensor:
+#     """
+#     Build an embedding matrix aligned to vocabulary (NEEDS {word: index} dictionary)
 
-    Args:
-        vocab: {word: index} dict
+#     Args:
+#         vocab: {word: index} dict
 
-    Returns:
-        matrix: Tensor of shape (len(vocab), 768)
-    """
-    static_embeddings = safety_bert.embeddings.word_embeddings.weight.detach()
-    # shape: (30522, 768) — one vector per BERT subword token
+#     Returns:
+#         matrix: Tensor of shape (len(vocab), 768)
+#     """
+#     static_embeddings = safety_bert.embeddings.word_embeddings.weight.detach()
+#     # shape: (30522, 768) — one vector per BERT subword token
 
-    matrix = torch.zeros(len(vocab), 768)
-    found, oov = 0, []
+#     matrix = torch.zeros(len(vocab), 768)
+#     found, oov = 0, []
 
-    for word, idx in vocab.items():
-        # BERT uses WordPiece — a word may split into multiple subword tokens
-        subword_ids = tokenizer.encode(word, add_special_tokens=False)
-        if subword_ids:
-            # Average subword embeddings to get one vector per word
-            matrix[idx] = static_embeddings[subword_ids].mean(dim=0)
-            found += 1
-        else:
-            oov.append(word)
+#     for word, idx in vocab.items():
+#         # BERT uses WordPiece — a word may split into multiple subword tokens
+#         subword_ids = tokenizer.encode(word, add_special_tokens=False)
+#         if subword_ids:
+#             # Average subword embeddings to get one vector per word
+#             matrix[idx] = static_embeddings[subword_ids].mean(dim=0)
+#             found += 1
+#         else:
+#             oov.append(word)
 
-    print(f"Coverage: {found}/{len(vocab)} words "
-          f"({100*found/len(vocab):.1f}%)")
-    if oov:
-        print(f"OOV sample: {oov[:10]}")
-    return matrix
+#     print(f"Coverage: {found}/{len(vocab)} words "
+#           f"({100*found/len(vocab):.1f}%)")
+#     if oov:
+#         print(f"OOV sample: {oov[:10]}")
+#     return matrix
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -351,183 +439,183 @@ def get_embedding_matrix(vocab: dict[str, int]) -> torch.Tensor:
 # Run each incident report through safetyBERT and get per-token hidden states.
 # Your Bi-GRU then processes these instead of a simple embedding lookup.
 # ─────────────────────────────────────────────────────────────────────────────
-def get_contextual_embeddings(
-    texts: list[str],
-    batch_size: int = 16,
-    max_length: int = 128,
-    device: str = "cpu"
-) -> list[torch.Tensor]:
-    """
-    Encode a list of raw incident descriptions into contextual token embeddings.
+# def get_contextual_embeddings(
+#     texts: list[str],
+#     batch_size: int = 16,
+#     max_length: int = 128,
+#     device: str = "cpu"
+# ) -> list[torch.Tensor]:
+#     """
+#     Encode a list of raw incident descriptions into contextual token embeddings.
 
-    Args:
-        texts:      List of raw description strings (before your preprocessing)
-        batch_size: How many documents to encode at once
-        max_length: BERT max tokens — 128 is fine for incident reports
-        device:     'cuda' or 'cpu'
+#     Args:
+#         texts:      List of raw description strings (before your preprocessing)
+#         batch_size: How many documents to encode at once
+#         max_length: BERT max tokens — 128 is fine for incident reports
+#         device:     'cuda' or 'cpu'
 
-    Returns:
-        List of tensors, each shape (seq_len, 768) — one per document.
-        seq_len varies per document (padding removed).
-    """
-    safety_bert.to(device)
-    all_embeddings = []
+#     Returns:
+#         List of tensors, each shape (seq_len, 768) — one per document.
+#         seq_len varies per document (padding removed).
+#     """
+#     safety_bert.to(device)
+#     all_embeddings = []
 
-    for i in range(0, len(texts), batch_size):
-        batch_texts = texts[i : i + batch_size]
+#     for i in range(0, len(texts), batch_size):
+#         batch_texts = texts[i : i + batch_size]
 
-        inputs = tokenizer(
-            batch_texts,
-            return_tensors="pt",
-            padding=True,
-            truncation=True,
-            max_length=max_length,
-        ).to(device)
+#         inputs = tokenizer(
+#             batch_texts,
+#             return_tensors="pt",
+#             padding=True,
+#             truncation=True,
+#             max_length=max_length,
+#         ).to(device)
 
-        with torch.no_grad():
-            outputs = safety_bert(**inputs)
+#         with torch.no_grad():
+#             outputs = safety_bert(**inputs)
 
-        # last_hidden_state: (batch, seq_len, 768)
-        hidden = outputs.last_hidden_state
+#         # last_hidden_state: (batch, seq_len, 768)
+#         hidden = outputs.last_hidden_state
 
-        # Strip padding — return only real tokens per document
-        for j, length in enumerate(inputs["attention_mask"].sum(dim=1)):
-            # slice off [CLS] and [SEP] too — your Bi-GRU doesn't need them
-            all_embeddings.append(hidden[j, 1:length-1, :].cpu())
+#         # Strip padding — return only real tokens per document
+#         for j, length in enumerate(inputs["attention_mask"].sum(dim=1)):
+#             # slice off [CLS] and [SEP] too — your Bi-GRU doesn't need them
+#             all_embeddings.append(hidden[j, 1:length-1, :].cpu())
 
-    return all_embeddings
+#     return all_embeddings
 
 
 # %%
-vocab = {
-    "worker": 0,
-    "fell": 1,
-    "on": 2,
-    "ladder": 3
-}
+# vocab = {
+#     "worker": 0,
+#     "fell": 1,
+#     "on": 2,
+#     "ladder": 3
+# }
 
-flagged_df = pd.concat(flagged_rows).drop_duplicates(subset='reference')
-flagged_df.to_csv("labelling_review_flagged.csv", index=False)
-print(f"Exported {len(flagged_df)} flagged cases to labelling_review_flagged.csv")
+# flagged_df = pd.concat(flagged_rows).drop_duplicates(subset='reference')
+# flagged_df.to_csv("labelling_review_flagged.csv", index=False)
+# print(f"Exported {len(flagged_df)} flagged cases to labelling_review_flagged.csv")
 
 # %% [markdown]
 # ## New Section
 
 # %%
-import torch
-from implementations.simple_bi_gru import BiGRUClassifier, build_bigru_dataloader
-from modules.training_loop import training
-from modules.encoding import LabelEncoder
-from modules.encoding.vocab_encoder import VocabEncoder
-from modules.encoding.sequence_encoder import SequenceEncoder
+# import torch
+# from implementations.simple_bi_gru import BiGRUClassifier, build_bigru_dataloader
+# from modules.training_loop import training
+# from modules.encoding import LabelEncoder
+# from modules.encoding.vocab_encoder import VocabEncoder
+# from modules.encoding.sequence_encoder import SequenceEncoder
 
-tokens_col = "description_tokens_lemma"
+# tokens_col = "description_tokens_lemma"
 
-train_tokenized_docs = model1_train[tokens_col].tolist()
-val_tokenized_docs   = model1_valid[tokens_col].tolist()
-test_tokenized_docs  = model1_test[tokens_col].tolist()
+# train_tokenized_docs = model1_train[tokens_col].tolist()
+# val_tokenized_docs   = model1_valid[tokens_col].tolist()
+# test_tokenized_docs  = model1_test[tokens_col].tolist()
 
 
 # %%
 # Build vocab on training set only (min_freq=2 filters noise)
-vocab_enc = VocabEncoder(min_freq=2)
-vocab_enc.fit(train_tokenized_docs)
+# vocab_enc = VocabEncoder(min_freq=2)
+# vocab_enc.fit(train_tokenized_docs)
 
 # Determine max_len from training set (95th percentile avoids outlier padding)
-import numpy as np
-train_lens_raw = [len(doc) for doc in train_tokenized_docs]
-max_len = int(np.percentile(train_lens_raw, 95))
-print(f"vocab_size={vocab_enc.vocab_size}, max_len={max_len}")
+# import numpy as np
+# train_lens_raw = [len(doc) for doc in train_tokenized_docs]
+# max_len = int(np.percentile(train_lens_raw, 95))
+# print(f"vocab_size={vocab_enc.vocab_size}, max_len={max_len}")
 
-seq_enc = SequenceEncoder(vocab_enc, max_length=max_len)
+# seq_enc = SequenceEncoder(vocab_enc, max_length=max_len)
 
-def encode_split(docs):
-    seqs    = torch.tensor(seq_enc.encode_sequences(docs), dtype=torch.long)
-    lengths = torch.tensor([min(len(d), max_len) for d in docs], dtype=torch.long)
-    return seqs, lengths
+# def encode_split(docs):
+#     seqs    = torch.tensor(seq_enc.encode_sequences(docs), dtype=torch.long)
+#     lengths = torch.tensor([min(len(d), max_len) for d in docs], dtype=torch.long)
+#     return seqs, lengths
 
-train_seqs, train_lengths = encode_split(train_tokenized_docs)
-val_seqs,   val_lengths   = encode_split(val_tokenized_docs)
-test_seqs,  test_lengths  = encode_split(test_tokenized_docs)
+# train_seqs, train_lengths = encode_split(train_tokenized_docs)
+# val_seqs,   val_lengths   = encode_split(val_tokenized_docs)
+# test_seqs,  test_lengths  = encode_split(test_tokenized_docs)
 
 
 # %%
 # Energy type labels
-energy_enc = LabelEncoder()
-energy_enc.fit(model1_train["energy_type"].tolist())
-train_energy = torch.tensor(energy_enc.encode_many(model1_train["energy_type"].tolist()))
-val_energy   = torch.tensor(energy_enc.encode_many(model1_valid["energy_type"].tolist()))
-test_energy  = torch.tensor(energy_enc.encode_many(model1_test["energy_type"].tolist()))
+# energy_enc = LabelEncoder()
+# energy_enc.fit(model1_train["energy_type"].tolist())
+# train_energy = torch.tensor(energy_enc.encode_many(model1_train["energy_type"].tolist()))
+# val_energy   = torch.tensor(energy_enc.encode_many(model1_valid["energy_type"].tolist()))
+# test_energy  = torch.tensor(energy_enc.encode_many(model1_test["energy_type"].tolist()))
 
 # Potential damage labels
-damage_enc = LabelEncoder()
-damage_enc.fit(model1_train["potential_damage"].tolist())
-train_damage = torch.tensor(damage_enc.encode_many(model1_train["potential_damage"].tolist()))
-val_damage   = torch.tensor(damage_enc.encode_many(model1_valid["potential_damage"].tolist()))
-test_damage  = torch.tensor(damage_enc.encode_many(model1_test["potential_damage"].tolist()))
+# damage_enc = LabelEncoder()
+# damage_enc.fit(model1_train["potential_damage"].tolist())
+# train_damage = torch.tensor(damage_enc.encode_many(model1_train["potential_damage"].tolist()))
+# val_damage   = torch.tensor(damage_enc.encode_many(model1_valid["potential_damage"].tolist()))
+# test_damage  = torch.tensor(damage_enc.encode_many(model1_test["potential_damage"].tolist()))
 
 
 # %%
-train_dl = build_bigru_dataloader(train_seqs, train_lengths, train_energy, train_damage)
-val_dl   = build_bigru_dataloader(val_seqs,   val_lengths,   val_energy,   val_damage,   shuffle=False)
-test_dl  = build_bigru_dataloader(test_seqs,  test_lengths,  test_energy,  test_damage,  shuffle=False)
+# train_dl = build_bigru_dataloader(train_seqs, train_lengths, train_energy, train_damage)
+# val_dl   = build_bigru_dataloader(val_seqs,   val_lengths,   val_energy,   val_damage,   shuffle=False)
+# test_dl  = build_bigru_dataloader(test_seqs,  test_lengths,  test_energy,  test_damage,  shuffle=False)
 
 
 # %%
-device = "cuda" if torch.cuda.is_available() else "cpu"
-num_classes = energy_enc.num_classes
+# device = "cuda" if torch.cuda.is_available() else "cpu"
+# num_classes = energy_enc.num_classes
 
-model = BiGRUClassifier(
-    vocab_size=vocab_enc.vocab_size,
-    embedding_dim=128,
-    hidden_dim=128,
-    num_classes=num_classes,
-).to(device)
+# model = BiGRUClassifier(
+#     vocab_size=vocab_enc.vocab_size,
+#     embedding_dim=128,
+#     hidden_dim=128,
+#     num_classes=num_classes,
+# ).to(device)
 
-results = training(
-    model_type="bigru",
-    model=model,
-    train_dl=train_dl,
-    valid_dl=val_dl,
-    test_dl=test_dl,
-    epochs=50,
-    device=device,
-    patience=10,
-    best_metric="f1_macro",
-    criterion_type="focal",
-    need_length=True,   # tells the loop to call model(D, DL)
-    energy_model=True,  # set False to predict potential_damage instead
-    num_classes=num_classes,
-)
+# results = training(
+#     model_type="bigru",
+#     model=model,
+#     train_dl=train_dl,
+#     valid_dl=val_dl,
+#     test_dl=test_dl,
+#     epochs=50,
+#     device=device,
+#     patience=10,
+#     best_metric="f1_macro",
+#     criterion_type="focal",
+#     need_length=True,   # tells the loop to call model(D, DL)
+#     energy_model=True,  # set False to predict potential_damage instead
+#     num_classes=num_classes,
+# )
 
 
 # %%
-device = "cuda" if torch.cuda.is_available() else "cpu"
-num_classes = energy_enc.num_classes
+# device = "cuda" if torch.cuda.is_available() else "cpu"
+# num_classes = energy_enc.num_classes
 
-model = BiGRUClassifier(
-    vocab_size=vocab_enc.vocab_size,
-    embedding_dim=128,
-    hidden_dim=128,
-    num_classes=num_classes,
-).to(device)
+# model = BiGRUClassifier(
+#     vocab_size=vocab_enc.vocab_size,
+#     embedding_dim=128,
+#     hidden_dim=128,
+#     num_classes=num_classes,
+# ).to(device)
 
-results = training(
-    model_type="bigru",
-    model=model,
-    train_dl=train_dl,
-    valid_dl=val_dl,
-    test_dl=test_dl,
-    epochs=50,
-    device=device,
-    patience=10,
-    best_metric="f1_macro",
-    criterion_type="focal",
-    need_length=True,   # tells the loop to call model(D, DL)
-    energy_model=False,  # set False to predict potential_damage instead
-    num_classes=num_classes,
-)
+# results = training(
+#     model_type="bigru",
+#     model=model,
+#     train_dl=train_dl,
+#     valid_dl=val_dl,
+#     test_dl=test_dl,
+#     epochs=50,
+#     device=device,
+#     patience=10,
+#     best_metric="f1_macro",
+#     criterion_type="focal",
+#     need_length=True,   # tells the loop to call model(D, DL)
+#     energy_model=False,  # set False to predict potential_damage instead
+#     num_classes=num_classes,
+# )
 
-matrix = get_embedding_matrix(vocab)
-print(matrix.shape)  # → torch.Size([4, 768])
-print(matrix)
+# matrix = get_embedding_matrix(vocab)
+# print(matrix.shape)  # → torch.Size([4, 768])
+# print(matrix)

@@ -226,7 +226,7 @@ class RunSaver:
 
 
     # PLOT HISTORY // Generate and save plots for each metric in the history
-    def plot_history(self, best_epoch, save_dir, save_name):
+    def plot_history(self, best_epoch, save_dir, save_name, class_dict=None):
         """Generate and save per-metric and combined plots from training history."""
         # Define standard y-axis ranges for metrics with consistent bounds
         y_axis_ranges = {
@@ -310,12 +310,12 @@ class RunSaver:
         if val_confusion_matrices and len(val_confusion_matrices) >= best_epoch - 1:
             best_val_cm = val_confusion_matrices[best_epoch - 1]
             val_cm_path = Path(save_dir) / f"{save_name}_val_confusion_matrix_epoch{best_epoch}.png"
-            self.plot_confusion_matrix(best_val_cm, val_cm_path)
+            self.plot_confusion_matrix(best_val_cm, val_cm_path, class_dict=class_dict)
         # Plot test confusion matrix
         if test_confusion_matrices:
             test_cm = test_confusion_matrices[-1] if isinstance(test_confusion_matrices, list) else test_confusion_matrices
             test_cm_path = Path(save_dir) / f"{save_name}_test_confusion_matrix.png"
-            self.plot_confusion_matrix(test_cm, test_cm_path)
+            self.plot_confusion_matrix(test_cm, test_cm_path, class_dict=class_dict)
 
 
         # Combined plot: accuracy, precision_macro, recall_macro, f1_macro

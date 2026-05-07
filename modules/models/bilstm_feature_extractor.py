@@ -8,6 +8,7 @@ from torch.nn.utils.rnn import pack_padded_sequence
 class BiLSTMFeatureExtractor(nn.Module):
     """Extract feature vectors from token sequences using a BiLSTM."""
     def __init__(self, bilstm_model):
+        """Initialize the BiLSTM feature extractor."""
         super().__init__()
         self.embedding = bilstm_model.embedding
         self.lstm = bilstm_model.lstm

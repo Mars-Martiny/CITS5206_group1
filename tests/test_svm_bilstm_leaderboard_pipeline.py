@@ -1,7 +1,9 @@
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from modules.models import BiLSTMFeatureExtractor, SVMClassifierWrapper
+from modules.models import BiLSTMFeatureExtractor, SVMClassifierWrapper, BiLSTMClassifier
+
+
 from pipeline.run_feature_inference import run_feature_pipeline
 
 
@@ -32,12 +34,14 @@ def test_svm_bilstm_feature_pipeline_logs_to_leaderboard(tmp_path):
     train_dl = make_dataloader()
     test_dl = make_dataloader()
 
-    feature_extractor = BiLSTMFeatureExtractor(
+    bilstm_model = BiLSTMClassifier(
         vocab_size=20,
         embedding_dim=8,
         hidden_dim=16,
+        num_classes=2,
     )
 
+    feature_extractor = BiLSTMFeatureExtractor(bilstm_model)
     classifier = SVMClassifierWrapper(
         kernel="linear",
         C=1.0,

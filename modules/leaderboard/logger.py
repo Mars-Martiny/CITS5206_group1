@@ -132,6 +132,9 @@ def _build_row(run_summary: dict, config: dict, model_path: str, leaderboard_dir
         "req_fatal_accuracy_met": _last_test("req_fatal_accuracy_met"),
         "req_all_f1_targets_met": _last_test("req_all_f1_targets_met"),
         "per_class_requirements": json.dumps(_last_test("per_class_requirements")),
+        # --- Search parameters ---
+        "search_parameters": json.dumps(config.get("parameters", {})),
+        "is_hyperparameter_search": config.get("is_hyperparameter_search", False),
     }
 
 
@@ -151,3 +154,45 @@ def _get_git_commit_hash() -> str:
         return result.stdout.strip()
     except Exception:
         return ""
+    
+
+def log_search_run(run_summary: dict, config: dict, model_path: str, leaderboard_dir: str = "leaderboard") -> None:
+    """Log a hyperparameter search run to the search-specific leaderboard.
+
+    Records to two locations:
+    - leaderboard/search/all_searches.csv: all search runs combined
+    - leaderboard/search/search_TIMESTAMP.csv: this search session only
+
+    Args:
+        run_summary: Dictionary of run summary from train_loop.
+        config: Training configuration dictionary.
+        model_path: Path of the saved model.
+        leaderboard_dir: Base leaderboard directory. Defaults to 'leaderboard'.
+    """
+    leaderboard_dir = Path(leaderboard_dir)
+    search_dir = leaderboard_dir / "search"
+    search_dir.mkdir(parents=True, exist_ok=True)
+
+    row = _build_row(run_summary, config, model_path, leaderboard_dir)
+
+    # 1. Append to all_searches.csv
+    all_searches_path = search_dir / "all_searches.csv"
+    if all_searches_path.exists():
+        existing = pd.read_csv(all_searches_path)
+        updated = pd.concat([existing, pd.DataFrame([row])], ignore_index=True)
+    else:
+        updated = pd.DataFrame([row])
+    updated.to_csv(all_searches_path, index=False)
+
+    # 2. Append to search_TIMESTAMP.csv
+    timestamp = config.get("timestamp", datetime.now().strftime("%Y%m%d_%H%M%S"))
+    session_path = search_dir / f"search_{timestamp}.csv"
+    if session_path.exists():
+        existing = pd.read_csv(session_path)
+        updated = pd.concat([existing, pd.DataFrame([row])], ignore_index=True)
+    else:
+        updated = pd.DataFrame([row])
+    updated.to_csv(session_path, index=False)
+
+    print(f"Search leaderboard updated: {all_searches_path}")
+    print(f"Search session leaderboard updated: {session_path}")

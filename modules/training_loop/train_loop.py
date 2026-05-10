@@ -14,7 +14,7 @@ from .validation import validate
 from .run_saving import RunSaver
 from .utility import _safe_class_name, _serialise_value, _is_better
 from .evaluate import evaluate
-from ..leaderboard import log_run
+from ..leaderboard import log_run, log_search_run
 
 
 #  MAIN TRAINING LOOP // ensures all control variables are consistent // compatible with Dataloader-based pipelines
@@ -125,12 +125,20 @@ def train_model_loop(
         run_saver.plot_history(best_epoch, config["save_dir"], config["save_name"])
 
         if config.get("log_leaderboard", True):
-            log_run(
-                run_summary=run_summary,
-                config=config,
-                model_path=model_path,
-                leaderboard_dir=config.get("leaderboard_dir", "leaderboard"),
-            )
+            if config.get("is_hyperparameter_search", False):
+                log_search_run(
+                    run_summary=run_summary,
+                    config=config,
+                    model_path=model_path,
+                    leaderboard_dir=config.get("leaderboard_dir", "leaderboard"),
+                )
+            else:
+                log_run(
+                    run_summary=run_summary,
+                    config=config,
+                    model_path=model_path,
+                    leaderboard_dir=config.get("leaderboard_dir", "leaderboard"),
+                )
 
         if verbose:
             print(f"Run saved to: {config['save_dir']}")

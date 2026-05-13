@@ -61,6 +61,30 @@ What we *can* report from the **best runs above** (these are logged per-run in `
 
 Note: Optuna also searches over `hidden_dim` (and other items), but `hidden_dim` is not currently recorded in `leaderboard/leaderboard.csv`. If needed, we should either (a) re-run the Optuna cell to re-print `best_params`, or (b) log `hidden_dim` into the leaderboard for each TF‑IDF run.
 
+# Fundamental Limitation: Bag-of-Words Has No Word Order
+
+TF-IDF is a **bag-of-words** model. It converts a document into a vector of token frequencies weighted by inverse document frequency, but the order of those tokens is completely discarded. This is a structural limitation that cannot be fixed by tuning hyperparameters.
+
+## The consequence for incident classification
+
+Consider two incident descriptions:
+
+> _"Worker fell on the truck."_
+
+> _"Truck fell on the worker."_
+
+Both sentences contain exactly the same words. TF-IDF produces **identical feature vectors** for both, so the classifier assigns them the same prediction — even though the first is likely a fall from height and the second is a struck-by event with entirely different energy type and damage implications.
+
+This is not an edge case. Incident reports commonly describe the same actors and objects in different causal roles: a person can fall _onto_ a surface or a surface can fall _onto_ a person; equipment can strike a worker or a worker can strike equipment. The label depends on who is acting and who is receiving the action, which is encoded in word order, not word presence.
+
+## What sequence models gain
+
+Bi-GRU and transformer-based models process tokens in order and build hidden states that capture subject-verb-object relationships. The same two sentences above would produce different hidden-state sequences and, in a well-trained model, different predictions. This is the primary structural reason those architectures can outperform TF-IDF on this task even when TF-IDF has more hyperparameter tuning.
+
+TF-IDF is still useful as a fast, interpretable baseline — its macro-F1 of ~0.63 represents the ceiling of what word-frequency signal alone can achieve on this dataset.
+
+---
+
 # Negative Results
 ## Using Transform Average Weighting and L2 Normalization did not work
 By using doc_vec = sum(tfidf_score(word) * embed(word) for word in doc) / sum(tfidf_score(word) for word in doc)

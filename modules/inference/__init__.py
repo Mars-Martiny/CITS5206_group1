@@ -2,7 +2,7 @@
 
 import torch
 import torch.nn.functional as F
-from modules.training_loop.utility import _unpack_batch
+
 
 def run_inference(config, dataloader=None):
     """Run model inference on a dataset.
@@ -26,6 +26,8 @@ def run_inference(config, dataloader=None):
 
     if use_temperature and temperature <= 0:
         raise ValueError("temperature must be > 0 when use_temperature=True")
+
+    from modules.training_loop.utility import _unpack_batch
 
     model.to(device)
     model.eval()

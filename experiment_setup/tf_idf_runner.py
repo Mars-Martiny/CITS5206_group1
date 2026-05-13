@@ -1,6 +1,7 @@
 """Experiment runner utilities for TF-IDF classification."""
 
 import json
+import pickle
 import torch
 from pathlib import Path
 
@@ -148,7 +149,8 @@ def tf_idf_train(
     test_labels,
     energy_model,
     train_config=None,
-    requirements={}
+    requirements={},
+    artifact_extras=None,
 ):
     """Train a TF-IDF classifier.
 
@@ -187,10 +189,16 @@ def tf_idf_train(
             - high_threshold: min fraction of predictions in high-confidence tier (default 0.70)
             - fatal_accuracy: min recall on true fatal-class samples (default 0.95)
             - f1_target: {class_index: min_f1} — use 0.0 to mark a class as having no target
+        artifact_extras: Optional dict with ``text_col``, ``lemma_config``, ``keep_numbers`` for saving
+            ``*_artifacts.pkl`` after training when ``artifact_extras`` is not None.
+
     Returns:
         dict: The result dictionary returned by `training()`.
     """
     cfg = {**_TFIDF_TRAIN_DEFAULTS, **(train_config or {})}
+
+    batch_size = int(cfg.pop("batch_size", 32))
+    hidden_dim_param = cfg.pop("hidden_dim", 256)
 
     vectorizer = TFIDFVectorizer().fit(train_tokenized_docs)
 
@@ -226,12 +234,16 @@ def tf_idf_train(
             "Expected 'tfidf' or 'tfidf_embed_avg'."
         )
 
-    train_dl = build_tfidf_dataloader(train_vecs, train_labels)
-    val_dl   = build_tfidf_dataloader(val_vecs, val_labels, shuffle=False)
-    test_dl  = build_tfidf_dataloader(test_vecs, test_labels, shuffle=False)
+    train_dl = build_tfidf_dataloader(train_vecs, train_labels, batch_size=batch_size)
+    val_dl   = build_tfidf_dataloader(val_vecs, val_labels, batch_size=batch_size, shuffle=False)
+    test_dl  = build_tfidf_dataloader(test_vecs, test_labels, batch_size=batch_size, shuffle=False)
 
     num_classes = label_enc.num_classes
-    model  = TFIDFClassifier(vocab_size=input_dim, num_classes=num_classes, hidden_dim=cfg.pop("hidden_dim", 256))
+    model = TFIDFClassifier(
+        vocab_size=input_dim,
+        num_classes=num_classes,
+        hidden_dim=hidden_dim_param,
+    )
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model  = model.to(device)
 
@@ -241,7 +253,7 @@ def tf_idf_train(
     optimiser = optimizer_fn(model) if optimizer_fn is not None else None
     scheduler = scheduler_fn(optimiser) if (scheduler_fn is not None and optimiser is not None) else None
 
-    return training(
+    result = training(
         model_type="tf_idf",
         model=model,
         train_dl=train_dl,
@@ -256,6 +268,31 @@ def tf_idf_train(
         class_dict=label_enc.id_to_label,
         **cfg,
     )
+
+    if (
+        artifact_extras is not None
+        and result.get("best_model_state_dict") is not None
+        and result["config"].get("save")
+    ):
+        save_dir = Path(result["config"]["save_dir"])
+        save_name = result["config"]["save_name"]
+        artifacts = {
+            "vectorizer": vectorizer,
+            "label_enc": label_enc,
+            "energy_model": energy_model,
+            "feature_representation": feature_representation,
+            "embedding_model_name": embedding_model_name,
+            "hidden_dim": hidden_dim_param,
+            "batch_size": batch_size,
+            "text_col": artifact_extras.get("text_col"),
+            "lemma_config": artifact_extras.get("lemma_config"),
+            "keep_numbers": artifact_extras.get("keep_numbers", False),
+        }
+        artifact_path = save_dir / f"{save_name}_artifacts.pkl"
+        with open(artifact_path, "wb") as af:
+            pickle.dump(artifacts, af)
+
+    return result
 
 
 def tf_idf_run_single(
@@ -294,7 +331,13 @@ def tf_idf_run_single(
         train_df, valid_df, test_df, text_col, keep_numbers, lemma_config
     )
     encoded = tf_idf_encode(df_train, df_valid, df_test, text_col, lemma_config, energy_model)
-    return tf_idf_train(*encoded, train_config=train_config, requirements=requirements)
+    artifact_extras = {"text_col": text_col, "lemma_config": lemma_config, "keep_numbers": keep_numbers}
+    return tf_idf_train(
+        *encoded,
+        train_config=train_config,
+        requirements=requirements,
+        artifact_extras=artifact_extras,
+    )
 
 
 def tf_idf_run_multiple(

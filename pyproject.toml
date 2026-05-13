@@ -16,3 +16,9 @@ convention = "google"
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["D"]
 "main_notebook.py" = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: tests that download model weights or run BERT/LoopedTransformer (deselect with '-m not slow')",
+]

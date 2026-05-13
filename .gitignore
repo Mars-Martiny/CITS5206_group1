@@ -1,3 +1,4 @@
+docs/build/
 .ipynb_checkpoints
 .venv/
 .venv-1/
@@ -14,3 +15,4 @@ leaderboard/owner.conf
 confusion_matrix.png
 debugging.csv
 labelling_review_flagged.csv
+ML_Classification_Output_Example.csv

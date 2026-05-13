@@ -11,3 +11,6 @@ trained_models/*
 .idea
 data_corrector.py
 leaderboard/owner.conf
+confusion_matrix.png
+debugging.csv
+labelling_review_flagged.csv

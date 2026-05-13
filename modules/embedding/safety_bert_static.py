@@ -88,3 +88,51 @@ def get_safety_bert_embedding_matrix(
         matrix = matrix.to(device)
     return matrix
 
+
+def get_contextual_embeddings(
+    texts: list[str],
+    model_name: str = "bert-base-uncased",
+    batch_size: int = 16,
+    max_length: int = 128,
+    device: str = "cpu",
+) -> list[torch.Tensor]:
+    """Encode incident descriptions into contextual per-token embeddings via BERT.
+
+    Args:
+        texts:      List of raw description strings.
+        model_name: Hugging Face checkpoint name (same one used for static embeddings).
+        batch_size: Documents to encode per forward pass.
+        max_length: BERT max tokens — 128 is sufficient for incident reports.
+        device:     'cuda' or 'cpu'.
+
+    Returns:
+        List of float tensors, each shape ``(seq_len, hidden_dim)`` — one per
+        document.  ``seq_len`` varies (padding and [CLS]/[SEP] tokens stripped).
+    """
+    model, tokenizer = _load_model_and_tokenizer(model_name)
+    model.to(device)
+    all_embeddings: list[torch.Tensor] = []
+
+    texts = list(texts)  # accept pandas Series or any iterable, not just list[str]
+    for i in range(0, len(texts), batch_size):
+        batch_texts = texts[i : i + batch_size]
+
+        inputs = tokenizer(
+            batch_texts,
+            return_tensors="pt",
+            padding=True,
+            truncation=True,
+            max_length=max_length,
+        ).to(device)
+
+        with torch.no_grad():
+            outputs = model(**inputs)
+
+        hidden = outputs.last_hidden_state  # (batch, seq_len, hidden_dim)
+
+        for j, length in enumerate(inputs["attention_mask"].sum(dim=1)):
+            # Strip [CLS] (pos 0) and [SEP] (pos length-1) — BiGRU doesn't need them.
+            all_embeddings.append(hidden[j, 1 : length - 1, :].cpu())
+
+    return all_embeddings
+

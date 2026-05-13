@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 from .utility import _safe_class_name
-from .loss import get_loss_function
+from modules.train_tools.loss import get_loss_function
 from .imbalance import make_weighted_sampler
 
 

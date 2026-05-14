@@ -1,0 +1,24 @@
+{
+  "energy": [
+    "Human",
+    "Gravitational",
+    "Vehicular",
+    "Machine",
+    "Object",
+    "Electrical",
+    "Thermal",
+    "Chemical",
+    "Radiation",
+    "Noise",
+    "Other",
+    "Susceptible Part",
+    "Specialised Shape",
+    "Insufficient",
+    "Disasters"
+  ],
+  "damage": [
+    "Temporary / Minor Damage",
+    "Permanent Disabling Injury",
+    "Fatal"
+  ]
+}

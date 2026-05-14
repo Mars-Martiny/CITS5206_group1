@@ -1,6 +1,7 @@
 """Experiment runner utilities for BiGRU classification."""
 
 import json
+import pickle
 import numpy as np
 import torch
 from pathlib import Path
@@ -226,6 +227,7 @@ def bigru_train(
     energy_model=True,
     train_config=None,
     requirements={},
+    artifact_extras=None,
 ):
     """Train a BiGRU classifier.
 
@@ -281,6 +283,8 @@ def bigru_train(
             - ``high_threshold``: min fraction of predictions in the high-confidence tier
             - ``fatal_accuracy``: min recall on true fatal-class samples
             - ``f1_target``: ``{class_index: min_f1}``
+        artifact_extras: Optional dict passed from :func:`bigru_run_single` to persist
+            ``*_artifacts.pkl`` for inference preprocessing.
 
     Returns:
         dict: The result dictionary returned by
@@ -288,6 +292,7 @@ def bigru_train(
     """
     cfg = {**_BIGRU_TRAIN_DEFAULTS, **(train_config or {})}
 
+    batch_size = int(cfg.pop("batch_size", 32))
     embedding_type       = cfg.pop("embedding_type", "none")
     hidden_dim           = cfg.pop("hidden_dim", 128)
     dropout_prob         = cfg.pop("dropout_prob", 0.3)
@@ -348,9 +353,15 @@ def bigru_train(
 
     model = model.to(device)
 
-    train_dl = build_bigru_dataloader(train_seqs, train_lengths, train_energy, train_damage)
-    val_dl   = build_bigru_dataloader(val_seqs,   val_lengths,   val_energy,   val_damage,   shuffle=False)
-    test_dl  = build_bigru_dataloader(test_seqs,  test_lengths,  test_energy,  test_damage,  shuffle=False)
+    train_dl = build_bigru_dataloader(
+        train_seqs, train_lengths, train_energy, train_damage, batch_size=batch_size
+    )
+    val_dl   = build_bigru_dataloader(
+        val_seqs, val_lengths, val_energy, val_damage, batch_size=batch_size, shuffle=False
+    )
+    test_dl  = build_bigru_dataloader(
+        test_seqs, test_lengths, test_energy, test_damage, batch_size=batch_size, shuffle=False
+    )
 
     optimizer_fn = cfg.pop("optimizer_fn", None)
     scheduler_fn = cfg.pop("scheduler_fn", None)
@@ -358,7 +369,7 @@ def bigru_train(
     optimiser = optimizer_fn(model) if optimizer_fn is not None else None
     scheduler = scheduler_fn(optimiser) if (scheduler_fn is not None and optimiser is not None) else None
 
-    return training(
+    result = training(
         model_type=_BIGRU_MODEL_TYPE[embedding_type],
         model=model,
         train_dl=train_dl,
@@ -373,6 +384,38 @@ def bigru_train(
         class_dict=label_enc.id_to_label,
         **cfg,
     )
+
+    if (
+        artifact_extras is not None
+        and result.get("best_model_state_dict") is not None
+        and result["config"].get("save")
+    ):
+        save_dir = Path(result["config"]["save_dir"])
+        save_name = result["config"]["save_name"]
+        embedding_dim_saved = getattr(model.word_embeddings, "embedding_dim", embedding_dim)
+
+        artifacts = {
+            "vocab_enc": vocab_enc,
+            "seq_enc": seq_enc,
+            "max_len": max_len,
+            "energy_enc": energy_enc,
+            "damage_enc": damage_enc,
+            "embedding_type": embedding_type,
+            "embedding_model_name": embedding_model_name,
+            "energy_model": energy_model,
+            "hidden_dim": hidden_dim,
+            "dropout_prob": dropout_prob,
+            "freeze_emb": freeze_emb,
+            "embedding_dim": int(embedding_dim_saved),
+            "batch_size": batch_size,
+            "text_col": artifact_extras.get("text_col"),
+            "lemma_config": artifact_extras.get("lemma_config"),
+            "keep_numbers": artifact_extras.get("keep_numbers", False),
+        }
+        with open(save_dir / f"{save_name}_artifacts.pkl", "wb") as af:
+            pickle.dump(artifacts, af)
+
+    return result
 
 
 def bigru_run_single(
@@ -420,7 +463,18 @@ def bigru_run_single(
     else:
         encoded = bigru_encode(df_train, df_valid, df_test, text_col, lemma_config)
 
-    return bigru_train(*encoded, energy_model=energy_model, train_config=train_config, requirements=requirements)
+    artifact_extras = {
+        "text_col": text_col,
+        "lemma_config": lemma_config,
+        "keep_numbers": keep_numbers,
+    }
+    return bigru_train(
+        *encoded,
+        energy_model=energy_model,
+        train_config=train_config,
+        requirements=requirements,
+        artifact_extras=artifact_extras,
+    )
 
 
 def bigru_run_multiple(

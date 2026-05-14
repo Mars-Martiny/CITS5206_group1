@@ -59,9 +59,6 @@ def train_model_loop(
 
         train_metrics = train_one_epoch(config)
         val_metrics = validate(config)
-
-        # if config["scheduler"] is not None and not config["scheduler_step_per_batch"]:
-        #     config["scheduler"].step()
         
         if config["scheduler"] is not None and not config["scheduler_step_per_batch"]:
             step_scheduler(

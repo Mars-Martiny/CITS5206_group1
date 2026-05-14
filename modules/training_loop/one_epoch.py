@@ -50,9 +50,6 @@ def train_one_epoch(config):
             )
 
         optimiser.step()
-
-        # if scheduler is not None and config["scheduler_step_per_batch"]:
-        #     scheduler.step()
         
         if scheduler is not None and config["scheduler_step_per_batch"]:
             step_scheduler(

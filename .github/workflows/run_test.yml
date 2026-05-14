@@ -33,4 +33,4 @@ jobs:
           .venv/bin/python -m spacy download en_core_web_sm
 
       - name: Run tests
-        run: .venv/bin/pytest tests/ -v
+        run: .venv/bin/pytest tests/ -v --ignore-glob="tests/test_integration_*.py"

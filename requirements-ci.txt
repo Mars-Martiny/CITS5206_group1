@@ -1,5 +1,7 @@
 pandas
 pytest
+click
+rich
 contractions
 spacy
 torch
@@ -8,3 +10,4 @@ matplotlib
 seaborn
 numpy
 scikit-learn
+streamlit>=1.35

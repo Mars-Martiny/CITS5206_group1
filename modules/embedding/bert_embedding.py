@@ -65,6 +65,8 @@ class BertEmbeddingBackend(nn.Module, BaseEmbeddingBackend):
 
         # Base AutoModel outputs last_hidden_state for encoder models such as BERT
         token_embeddings = outputs.last_hidden_state
+        # Optional embedding-level dropout before sentence pooling.
+        # This is separate from classifier-head dropout.
         token_embeddings = self.dropout(token_embeddings)
 
         if self.config.pooling == "cls":

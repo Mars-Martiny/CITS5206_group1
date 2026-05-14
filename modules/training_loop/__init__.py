@@ -2,7 +2,10 @@
 
 from .config import _build_train_config
 from .train_loop import train_model_loop
-from .optimizer import create_optimizer, normalise_optimizer_config
+from modules.optimisation.optimiser_factory import (
+    create_optimiser,
+    normalise_optimiser_config,
+)
 
 __all__ = ["training", "_build_train_config", "train_model_loop", "create_optimizer", "normalise_optimizer_config",]
 

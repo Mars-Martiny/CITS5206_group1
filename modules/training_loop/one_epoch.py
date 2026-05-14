@@ -6,6 +6,7 @@ import torch.optim as optim
 
 from .utility import _unpack_batch, _get_learning_rates
 from .metrics import _compute_classification_metrics
+from ..optimisation.scheduler import step_scheduler
 
 
 # SINGLE EPOCH TRAINING LOOP // returning training accuracy and loss of one training epoch
@@ -50,8 +51,15 @@ def train_one_epoch(config):
 
         optimiser.step()
 
+        # if scheduler is not None and config["scheduler_step_per_batch"]:
+        #     scheduler.step()
+        
         if scheduler is not None and config["scheduler_step_per_batch"]:
-            scheduler.step()
+            step_scheduler(
+                scheduler=scheduler,
+                scheduler_config=config.get("scheduler_config"),
+                metrics=None,
+                )
 
         preds = logits.argmax(dim=1)
 

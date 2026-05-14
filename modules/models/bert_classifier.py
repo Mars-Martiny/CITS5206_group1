@@ -6,12 +6,13 @@ from modules.embedding.bert_embedding import BertEmbeddingBackend
 
 
 class BertClassifier(nn.Module):
-    """BERT embedding backend followed by a classification head.
-    
-    The classifier consists of a dropout layer and a linear layer mapping from the embedding dimension to the number of classes.
-    The forward pass takes tokenized inputs (input_ids, attention_mask, token_type_ids), obtains the sentence embedding from the embedding backend, and applies the classifier to produce class logits.
-    This model is designed for text classification tasks where the BERT embedding backend provides rich contextual representations of the input text, and the classifier head maps these representations to the target classes.
-    The modular design allows for easy swapping of the embedding backend or modification of the classifier architecture as needed for different tasks or datasets.
+    """Transformer embedding backend followed by a classification head.
+
+    The classifier receives a BERT-style embedding backend, obtains a sentence
+    embedding, and maps it to class logits using dropout and a linear layer.
+
+    This supports standard BERT, SafetyBERT, or any compatible transformer
+    backend that returns an EmbeddingOutput with sentence_embedding.
     """
 
     def __init__(
@@ -26,7 +27,8 @@ class BertClassifier(nn.Module):
         :type embedding_backend: BertEmbeddingBackend
         :param num_classes: Number of target classes for classification.
         :type num_classes: int
-        :param dropout: Dropout rate for the classifier.
+        :param dropout: Dropout rate applied in the classifier head before the
+        final linear layer.
         :type dropout: float
         """
         super().__init__()

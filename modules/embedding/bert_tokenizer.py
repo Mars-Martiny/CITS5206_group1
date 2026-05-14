@@ -23,7 +23,8 @@ class BertTokenizerWrapper:
         """Load the tokenizer for ``config.model_name``."""
         config.validate()
         self.config = config
-        self.tokenizer = AutoTokenizer.from_pretrained(config.model_name)
+        tokenizer_name = config.tokenizer_name or config.model_name
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
     def encode_texts(self, texts: Sequence[str]) -> dict[str, torch.Tensor]:
         """Tokenize a batch of texts for transformer input.

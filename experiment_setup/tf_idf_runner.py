@@ -235,11 +235,17 @@ def tf_idf_train(
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model  = model.to(device)
 
+    # optimizer_fn  = cfg.pop("optimizer_fn", None)
+    # scheduler_fn  = cfg.pop("scheduler_fn", None)
+
+    # optimiser = optimizer_fn(model) if optimizer_fn is not None else None
+    # scheduler = scheduler_fn(optimiser) if (scheduler_fn is not None and optimiser is not None) else None
+    
     optimizer_fn  = cfg.pop("optimizer_fn", None)
-    scheduler_fn  = cfg.pop("scheduler_fn", None)
+    scheduler_config = cfg.pop("scheduler_config", None)
 
     optimiser = optimizer_fn(model) if optimizer_fn is not None else None
-    scheduler = scheduler_fn(optimiser) if (scheduler_fn is not None and optimiser is not None) else None
+    scheduler = scheduler_config
 
     return training(
         model_type="tf_idf",
@@ -386,29 +392,65 @@ def tf_idf_hparam_search(
         def optimizer_fn(model):
             return torch.optim.Adam(model.parameters(), lr=lr)
 
-        def scheduler_fn(opt):
+        # def scheduler_fn(opt):
+        #     if scheduler == "cosine":
+        #         return torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs, eta_min=1e-6)
+        #     if scheduler == "cosine_warmup":
+        #         # Linear warmup for the first 10 % of epochs, then cosine decay
+        #         warmup = max(1, epochs // 10)
+        #         return torch.optim.lr_scheduler.SequentialLR(
+        #             opt,
+        #             schedulers=[
+        #                 torch.optim.lr_scheduler.LinearLR(opt, start_factor=1e-3, end_factor=1.0, total_iters=warmup),
+        #                 torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs - warmup, eta_min=1e-6),
+        #             ],
+        #             milestones=[warmup],
+        #         )
+        #     if scheduler == "step":
+        #         return torch.optim.lr_scheduler.StepLR(opt, step_size=max(1, epochs // 5), gamma=0.5)
+        #     return False  # False signals training() to use no scheduler
+        
+        def build_scheduler_config():
             if scheduler == "cosine":
-                return torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs, eta_min=1e-6)
+                return {
+                    "name": "CosineAnnealingLR",
+                    "T_max": epochs,
+                    "eta_min": 1e-6,
+                    "step_per_batch": False,
+                }
+
             if scheduler == "cosine_warmup":
-                # Linear warmup for the first 10 % of epochs, then cosine decay
                 warmup = max(1, epochs // 10)
-                return torch.optim.lr_scheduler.SequentialLR(
-                    opt,
-                    schedulers=[
-                        torch.optim.lr_scheduler.LinearLR(opt, start_factor=1e-3, end_factor=1.0, total_iters=warmup),
-                        torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=epochs - warmup, eta_min=1e-6),
-                    ],
-                    milestones=[warmup],
-                )
+                return {
+                    "name": "SequentialLR",
+                    "warmup_type": "linear",
+                    "warmup_iters": warmup,
+                    "start_factor": 1e-3,
+                    "end_factor": 1.0,
+                    "after_scheduler": "CosineAnnealingLR",
+                    "T_max": epochs - warmup,
+                    "eta_min": 1e-6,
+                    "step_per_batch": False,
+                }
+
             if scheduler == "step":
-                return torch.optim.lr_scheduler.StepLR(opt, step_size=max(1, epochs // 5), gamma=0.5)
-            return False  # False signals training() to use no scheduler
+                return {
+                    "name": "StepLR",
+                    "step_size": max(1, epochs // 5),
+                    "gamma": 0.5,
+                    "step_per_batch": False,
+                }
+
+            return {
+                "name": None,
+                "step_per_batch": False,
+            }
 
         cfg = {
             "epochs": epochs,
             "hidden_dim": hidden_dim,
             "optimizer_fn": optimizer_fn,
-            "scheduler_fn": scheduler_fn,
+            "scheduler_fn": build_scheduler_config(),
             "scheduler_step_per_batch": False,
             "patience": 15,
             "best_metric": "f1_macro",

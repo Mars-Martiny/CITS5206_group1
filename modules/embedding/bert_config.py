@@ -12,7 +12,8 @@ class BertEmbeddingConfig:
     :type model_name: str
     :param max_length: Maximum sequence length for tokenizer output.
     :type max_length: int
-    :param dropout: Dropout applied after transformer token embeddings.
+    :param dropout: Embedding dropout applied to transformer token embeddings
+        before pooling. This is separate from classifier-head dropout.
     :type dropout: float
     :param pooling: Pooling strategy for sentence embedding. Supported values:
         - ``"cls"``
@@ -23,6 +24,7 @@ class BertEmbeddingConfig:
     """
 
     model_name: str = "bert-base-uncased"
+    tokenizer_name: str | None = None
     max_length: int = 160
     dropout: float = 0.1
     pooling: str = "mean"
@@ -35,6 +37,8 @@ class BertEmbeddingConfig:
         """
         if not self.model_name:
             raise ValueError("model_name must be a non-empty string")
+        if self.tokenizer_name is not None and not self.tokenizer_name:
+            raise ValueError("tokenizer_name must be None or a non-empty string")
         if self.max_length <= 0:
             raise ValueError("max_length must be > 0")
         if not (0.0 <= self.dropout < 1.0):

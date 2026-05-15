@@ -82,8 +82,10 @@ def main():
     review_pg = st.Page("pages/human_review_page.py", title="Human Review", icon="👁️")
     report_pg = st.Page("pages/report_page.py", title="Report", icon="📄")
     settings_pg = st.Page("pages/settings_page.py", title="Settings", icon="⚙️")
+    retraining_pg = st.Page("pages/retraining_page.py", title="Retraining", icon="🔄")
+    about_pg = st.Page("pages/about_page.py", title="About", icon="ℹ️")
 
-    pg = st.navigation([train_pg, infer_pg, metrics_pg, review_pg, report_pg, settings_pg])
+    pg = st.navigation([train_pg, infer_pg, metrics_pg, review_pg, report_pg, settings_pg, retraining_pg, about_pg])
 
     with st.sidebar:
         if DOCS_INDEX.exists():

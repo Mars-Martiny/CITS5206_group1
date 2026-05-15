@@ -24,6 +24,11 @@ _BIGRU_MODEL_TYPE = {
 
 
 def _load_column_map():
+    """Load the configured column name mapping.
+
+    Returns:
+        dict: Mapping loaded from `column_map.json`.
+    """
     with open(_COLUMN_MAP_PATH) as f:
         return json.load(f)
 
@@ -604,7 +609,8 @@ def bigru_hparam_search(
             "log_leaderboard": True,
             "verbose": False,
         }
-        result = bigru_train(*encoded, energy_model=energy_model, train_config=cfg, requirements=requirements)
+        artifact_extras = {"text_col": text_col, "lemma_config": lemma_config, "keep_numbers": keep_numbers}
+        result = bigru_train(*encoded, energy_model=energy_model, train_config=cfg, requirements=requirements, artifact_extras=artifact_extras)
         return result["best_metric_value"]
 
     study = optuna.create_study(direction="maximize", study_name="bigru_hparam_search")

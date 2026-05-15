@@ -498,7 +498,8 @@ def tf_idf_hparam_search(
             # "feature_representation": "tfidf_embed_avg",
             # "embedding_model_name": "adanish91/safetybert",
         }
-        result = tf_idf_train(*encoded, train_config=cfg, requirements=requirements)
+        artifact_extras = {"text_col": text_col, "lemma_config": lemma_config, "keep_numbers": keep_numbers}
+        result = tf_idf_train(*encoded, train_config=cfg, requirements=requirements, artifact_extras=artifact_extras)
         return result["best_metric_value"]
 
     study = optuna.create_study(direction="maximize", study_name="tf_idf_hparam_search")

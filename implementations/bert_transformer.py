@@ -53,7 +53,7 @@ def get_best_available_device() -> torch.device:
 
 def encode_label_column(train_df, valid_df, test_df, label_col):
     """Fit label encoder on train labels and transform train/valid/test.
-    
+
     Args:
         train_df: Training dataframe.
         valid_df: Validation dataframe.
@@ -90,12 +90,12 @@ def encode_label_column(train_df, valid_df, test_df, label_col):
 
 def build_class_weights(train_df, label_col: str, device: torch.device):
     """Build inverse-frequency class weights on the target device.
-    
+
     Args:
         train_df: Training dataframe.
         label_col: Name of the column containing label data.
         device: PyTorch device to place the weights on.
-    
+
     Returns:
         Tensor of class weights.
     """
@@ -134,6 +134,7 @@ def run_bert_experiment(
     model_type="BERT",
     target_type="energy",
     scheduler_config=None,
+    verbose=True,
 ):
     """Train and evaluate a BERT-style classifier for one target label.
 
@@ -144,7 +145,7 @@ def run_bert_experiment(
         model_name="adanish91/safetybert"
         tokenizer_name="bert-base-uncased"
         model_type="SafetyBERT"
-        
+
     Arguments:
         train_df: Training dataframe.
         valid_df: Validation dataframe.
@@ -169,7 +170,8 @@ def run_bert_experiment(
         model_type: String identifier for the model type, used in metadata and save names.
         target_type: String identifier for the target type ("energy" or "risk"), used in metadata and save names.
         scheduler_config: Optional dictionary specifying the learning rate scheduler configuration. If None, no scheduler is used. Expected keys include "name" for the scheduler type and other scheduler-specific parameters.
-    
+        verbose: Will not print logs if False, defaults to True.
+
     Returns:
         Run summary returned by the shared training pipeline.
     """
@@ -310,6 +312,7 @@ def run_bert_experiment(
         },
         device=device,
 
+        verbose=verbose,
         compute_train_metrics=False,
         save=True,
         parent_dir="trained_models",

@@ -1,0 +1,3 @@
+env_type=conda
+env_name=hs_classifier
+gpu=nvidia

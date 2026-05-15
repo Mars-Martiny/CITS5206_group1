@@ -4,17 +4,17 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 LEADERBOARD_PATH = "leaderboard/leaderboard.csv"
-TIMESTAMP_RE = re.compile(r"_\d{8}_\d{6}.*$")
+_STRIP_RE = re.compile(r"(_\d{8}_\d{6}|_(hparam_)?trial_\d+).*$")
 
 
 def extract_model_name(run_name: str) -> str:
-    """Extract model name from num name.
+    """Extract model name from run name.
 
     Returns:
-      model name stripped out of the timestamp regex, or just model name if timestamp
-        is not present
+      model name with any trailing timestamp (_YYYYMMDD_HHMMSS),
+      trial suffix (_trial_N), or hparam-trial suffix (_hparam_trial_N) removed.
     """
-    return TIMESTAMP_RE.sub("", run_name) or run_name
+    return _STRIP_RE.sub("", run_name) or run_name
 
 
 def plot_leaderboard(csv_path: str = LEADERBOARD_PATH) -> None:

@@ -18,7 +18,13 @@ from transformers import AutoModel, AutoTokenizer
 
 @lru_cache(maxsize=4)
 def _load_model_and_tokenizer(model_name: str):
-    tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=True)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(model_name, use_fast=False)
+    except (TypeError, OSError):
+        # Some BERT-based checkpoints (e.g. adanish91/safetybert) don't ship a
+        # vocab.txt, causing resolved_vocab_files["vocab_file"] == None.
+        # Fall back to bert-base-uncased which shares the same vocabulary.
+        tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=False)
     model = AutoModel.from_pretrained(model_name)
     model.eval()
     return model, tokenizer

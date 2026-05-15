@@ -1,5 +1,6 @@
 """Experiment runner utilities for the LoopedTransformer classifier."""
 
+import json
 import pickle
 from pathlib import Path
 
@@ -13,9 +14,75 @@ from modules.embedding.bert_config import BertEmbeddingConfig
 from modules.embedding.bert_tokenizer import BertTokenizerWrapper
 from modules.encoding import LabelEncoder
 from modules.training_loop import training
+from modules import OneTextPreProcessor
+
+_COLUMN_MAP_PATH = Path(__file__).parent.parent / "column_map.json"
+
+
+def _load_tokenizer(model_name: str):
+    """Load tokenizer with a fallback to bert-base-uncased.
+
+    Some BERT-based checkpoints (e.g. adanish91/safetybert) don't ship a
+    vocab.txt, causing resolved_vocab_files["vocab_file"] == None and a
+    TypeError in BertTokenizer.__init__. Falling back to bert-base-uncased
+    is safe because SafetyBERT shares the same WordPiece vocabulary.
+    """
+    try:
+        return _AutoTokenizer.from_pretrained(model_name, use_fast=False)
+    except (TypeError, OSError):
+        return _AutoTokenizer.from_pretrained("bert-base-uncased", use_fast=False)
+
+
+def _load_column_map():
+    """Load the configured column name mapping.
+
+    Returns:
+        dict: Mapping loaded from `column_map.json`.
+    """
+    with open(_COLUMN_MAP_PATH) as f:
+        return json.load(f)
+
+
+def pre_process(data_df, text_col):
+    """Pre-process a dataset into the single-text format expected by BiGRU.
+
+    Args:
+        data_df: Input DataFrame to pre-process.
+        text_col: Name of the text column to process.
+
+    Returns:
+        pandas.DataFrame: The pre-processed DataFrame.
+    """
+    column_map = _load_column_map()
+    proc = OneTextPreProcessor(
+        keep_numbers=False,
+        column_map=column_map,
+        drop_null=True,
+        lemmatize=False,
+    )
+    return proc.pre_process_df(data_df, text_col)
+
+
+def pre_process_dataset(train_df, valid_df, test_df, text_col):
+    """Pre-process train/validation/test splits, applying the column map.
+
+    Args:
+        train_df: Training split DataFrame.
+        valid_df: Validation split DataFrame.
+        test_df: Test split DataFrame.
+        text_col: Name of the text column to process.
+
+    Returns:
+        tuple[pandas.DataFrame, pandas.DataFrame, pandas.DataFrame]: Processed
+        ``(df_train, df_valid, df_test)`` DataFrames.
+    """
+    df_train = pre_process(train_df, text_col)
+    df_valid = pre_process(valid_df, text_col)
+    df_test  = pre_process(test_df,  text_col)
+    return df_train, df_valid, df_test
 
 _LOOPED_DEFAULTS = {
-    "model_name": "adanish91/safetybert",
+    "model_name": "bert-base-uncased",
     "d_model": 256,
     "nhead": 8,
     "dim_feedforward": 1024,
@@ -39,7 +106,7 @@ _LOOPED_DEFAULTS = {
 
 def _resolve_max_length(train_df, text_col, model_name, percentile):
     """Compute max_length as the given percentile of tokenised training lengths."""
-    tok = _AutoTokenizer.from_pretrained(model_name)
+    tok = _load_tokenizer(model_name)
     lengths = [len(tok(t, truncation=False)["input_ids"]) for t in train_df[text_col]]
     return int(np.percentile(lengths, percentile))
 
@@ -83,7 +150,7 @@ def looped_transformer_encode(train_df, valid_df, test_df, text_col, energy_mode
     valid_dl = df_to_bert_dataloader(valid_df, text_col, "_label", tokenizer, batch_size=batch_size * 2, shuffle=False)
     test_dl  = df_to_bert_dataloader(test_df,  text_col, "_label", tokenizer, batch_size=batch_size * 2, shuffle=False)
 
-    tok = _AutoTokenizer.from_pretrained(model_name)
+    tok = _load_tokenizer(model_name)
     vocab_size = tok.vocab_size
 
     return train_dl, valid_dl, test_dl, label_enc, vocab_size, max_length
@@ -94,6 +161,8 @@ def looped_transformer_train(
     label_enc, vocab_size,
     energy_model=True,
     train_config=None,
+    text_col=None,
+    max_length=None,
 ):
     """Build and train a LoopedTransformer.
 
@@ -128,6 +197,8 @@ def looped_transformer_train(
             - ``verbose`` (bool, default ``True``)
             - ``optimizer_fn``: ``Callable[[nn.Module], Optimizer]``
             - ``scheduler_fn``: ``Callable[[Optimizer], LRScheduler]``
+        max_length: max length of encoded embeddings
+        text_col: Name of the text column to process.
 
     Returns:
         dict: The result dictionary returned by
@@ -153,7 +224,7 @@ def looped_transformer_train(
     optimiser = optimizer_fn(model) if optimizer_fn is not None else None
     scheduler = scheduler_fn(optimiser) if (scheduler_fn is not None and optimiser is not None) else None
 
-    return training(
+    result = training(
         model=model,
         model_type="looped_transformer",
         energy_model=energy_model,
@@ -176,6 +247,34 @@ def looped_transformer_train(
         verbose=cfg["verbose"],
         device=device,
     )
+
+    if (
+        text_col is not None
+        and max_length is not None
+        and result.get("best_model_state_dict") is not None
+        and result["config"].get("save")
+    ):
+        save_dir = Path(result["config"]["save_dir"])
+        save_name = result["config"]["save_name"]
+        artifacts = {
+            "label_enc": label_enc,
+            "max_length": max_length,
+            "model_name": cfg["model_name"],
+            "energy_model": energy_model,
+            "batch_size": cfg["batch_size"],
+            "vocab_size": vocab_size,
+            "d_model": cfg["d_model"],
+            "nhead": cfg["nhead"],
+            "dim_feedforward": cfg["dim_feedforward"],
+            "num_loops": cfg["num_loops"],
+            "dropout": cfg["dropout"],
+            "max_seq_len": cfg["max_seq_len"],
+            "text_col": text_col,
+        }
+        with open(save_dir / f"{save_name}_artifacts.pkl", "wb") as af:
+            pickle.dump(artifacts, af)
+
+    return result
 
 
 def looped_transformer_run_single(
@@ -205,37 +304,13 @@ def looped_transformer_run_single(
     train_dl, valid_dl, test_dl, label_enc, vocab_size, max_length = looped_transformer_encode(
         train_df, valid_df, test_df, text_col, energy_model, cfg
     )
-    result = looped_transformer_train(
+    return looped_transformer_train(
         train_dl, valid_dl, test_dl, label_enc, vocab_size,
         energy_model=energy_model,
         train_config=train_config,
+        text_col=text_col,
+        max_length=max_length,
     )
-    if (
-        result.get("best_model_state_dict") is not None
-        and result["config"].get("save")
-    ):
-        merged = cfg
-        save_dir = Path(result["config"]["save_dir"])
-        save_name = result["config"]["save_name"]
-        artifacts = {
-            "label_enc": label_enc,
-            "max_length": max_length,
-            "model_name": merged["model_name"],
-            "energy_model": energy_model,
-            "batch_size": merged["batch_size"],
-            "vocab_size": vocab_size,
-            "d_model": merged["d_model"],
-            "nhead": merged["nhead"],
-            "dim_feedforward": merged["dim_feedforward"],
-            "num_loops": merged["num_loops"],
-            "dropout": merged["dropout"],
-            "max_seq_len": merged["max_seq_len"],
-            "text_col": text_col,
-        }
-        with open(save_dir / f"{save_name}_artifacts.pkl", "wb") as af:
-            pickle.dump(artifacts, af)
-
-    return result
 
 
 def looped_transformer_run_multiple(
@@ -307,8 +382,10 @@ def looped_transformer_hparam_search(
     import optuna
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
+    train_df, valid_df, test_df = pre_process_dataset(train_df, valid_df, test_df, text_col)
+
     base_cfg = {**_LOOPED_DEFAULTS}
-    train_dl, valid_dl, test_dl, label_enc, vocab_size, _ = looped_transformer_encode(
+    train_dl, valid_dl, test_dl, label_enc, vocab_size, max_length = looped_transformer_encode(
         train_df, valid_df, test_df, text_col, energy_model, base_cfg
     )
 
@@ -345,6 +422,8 @@ def looped_transformer_hparam_search(
             train_dl, valid_dl, test_dl, label_enc, vocab_size,
             energy_model=energy_model,
             train_config=cfg,
+            text_col=text_col,
+            max_length=max_length,
         )
         return result["best_metric_value"]
 

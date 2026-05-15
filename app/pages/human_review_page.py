@@ -16,7 +16,8 @@ from app.components.banner import show_instruction_banner
 
 _LABELS_PATH = Path(__file__).resolve().parents[2] / "app" / "labels.json"
 _BATCH_SIZE = 3
-_DECISION_COL = "human_review_decision"
+_ENERGY_DECISION_COL = "human_review_energy_decision"
+_DAMAGE_DECISION_COL = "human_review_damage_decision"
 
 
 @st.cache_data
@@ -35,20 +36,16 @@ def _score_col(df: pd.DataFrame) -> str | None:
     return None
 
 
-def _pred_col_and_type(df: pd.DataFrame) -> tuple[str | None, str | None]:
-    if "predicted_damage_potential" in df.columns:
-        return "predicted_damage_potential", "damage"
-    if "predicted_energy_type" in df.columns:
-        return "predicted_energy_type", "energy"
-    return None, None
+def _energy_pred_info(df: pd.DataFrame) -> tuple[str | None, str | None]:
+    pred = "predicted_energy_type" if "predicted_energy_type" in df.columns else None
+    conf = "energy_confidence" if "energy_confidence" in df.columns else None
+    return pred, conf
 
 
-def _confidence_col(df: pd.DataFrame, pred_type: str | None) -> str | None:
-    if pred_type == "damage" and "damage_confidence" in df.columns:
-        return "damage_confidence"
-    if pred_type == "energy" and "energy_confidence" in df.columns:
-        return "energy_confidence"
-    return None
+def _damage_pred_info(df: pd.DataFrame) -> tuple[str | None, str | None]:
+    pred = "predicted_damage_potential" if "predicted_damage_potential" in df.columns else None
+    conf = "damage_confidence" if "damage_confidence" in df.columns else None
+    return pred, conf
 
 
 def _text_col_guess(df: pd.DataFrame) -> str:
@@ -97,40 +94,56 @@ def _confirmed_rows() -> set[int]:
 
 
 def _restore_state_from_df(df: pd.DataFrame) -> None:
-    """Populate session state from a previously saved CSV that has _DECISION_COL."""
+    """Populate session state from a previously saved CSV."""
     confirmed: set[int] = set()
-    for row_idx, row in df.iterrows():
-        raw = row.get(_DECISION_COL, "")
-        if pd.isna(raw):
-            continue
-        val = str(raw).strip()
-        if not val:
-            continue
-        confirmed.add(row_idx)
-        if val.startswith("Overridden: "):
-            st.session_state[f"decision_{row_idx}"] = "Override"
-            st.session_state[f"override_{row_idx}"] = val[len("Overridden: "):]
-        else:
-            st.session_state[f"decision_{row_idx}"] = "Accept"
+    col_prefix_pairs = []
+    if _ENERGY_DECISION_COL in df.columns:
+        col_prefix_pairs.append((_ENERGY_DECISION_COL, "energy"))
+    if _DAMAGE_DECISION_COL in df.columns:
+        col_prefix_pairs.append((_DAMAGE_DECISION_COL, "damage"))
+
+    for col, prefix in col_prefix_pairs:
+        for row_idx, row in df.iterrows():
+            raw = row.get(col, "")
+            if pd.isna(raw):
+                continue
+            val = str(raw).strip()
+            if not val:
+                continue
+            confirmed.add(row_idx)
+            if val.startswith("Overridden: "):
+                st.session_state[f"{prefix}_decision_{row_idx}"] = "Override"
+                st.session_state[f"{prefix}_override_{row_idx}"] = val[len("Overridden: "):]
+            else:
+                st.session_state[f"{prefix}_decision_{row_idx}"] = "Accept"
     st.session_state["confirmed_rows"] = confirmed
 
 
-def _decision_for(row_idx: int) -> str:
-    """Return the saved decision string for a confirmed row."""
-    decision = st.session_state.get(f"decision_{row_idx}", "Accept")
+def _decision_for(row_idx: int, prefix: str) -> str:
+    """Return the saved decision string for a confirmed row and prediction type."""
+    decision = st.session_state.get(f"{prefix}_decision_{row_idx}")
+    if not decision:
+        return ""
     if decision == "Override":
-        label = st.session_state.get(f"override_{row_idx}", "")
+        label = st.session_state.get(f"{prefix}_override_{row_idx}", "")
         return f"Overridden: {label}"
     return "Accepted"
 
 
 def _build_export_df(review_df: pd.DataFrame) -> pd.DataFrame:
-    """Attach _DECISION_COL: filled for confirmed rows, empty string for pending."""
+    """Attach a decision column for each prediction type present in the data."""
     result = review_df.copy()
     confirmed = _confirmed_rows()
-    result[_DECISION_COL] = [
-        _decision_for(idx) if idx in confirmed else "" for idx in result.index
-    ]
+    has_energy = "predicted_energy_type" in review_df.columns
+    has_damage = "predicted_damage_potential" in review_df.columns
+    if has_energy:
+        result[_ENERGY_DECISION_COL] = [
+            _decision_for(idx, "energy") if idx in confirmed else "" for idx in result.index
+        ]
+    if has_damage:
+        result[_DAMAGE_DECISION_COL] = [
+            _decision_for(idx, "damage") if idx in confirmed else "" for idx in result.index
+        ]
     return result
 
 
@@ -140,10 +153,13 @@ def _review_section(
     section_key: str,
     section_df: pd.DataFrame,
     text_col: str,
-    pred_col: str | None,
-    conf_col: str | None,
     score_col: str | None,
-    override_labels: list[str],
+    energy_pred_col: str | None,
+    energy_conf_col: str | None,
+    energy_labels: list[str],
+    damage_pred_col: str | None,
+    damage_conf_col: str | None,
+    damage_labels: list[str],
 ) -> None:
     """Show the next _BATCH_SIZE unconfirmed rows with Accept / Override widgets."""
     confirmed = _confirmed_rows()
@@ -162,55 +178,76 @@ def _review_section(
     for row_idx in batch_rows.index:
         row = batch_rows.loc[row_idx]
         full_text = str(row.get(text_col, row_idx))
-        pred_value = str(row.get(pred_col, "—")) if pred_col else "—"
-        conf_value = row.get(conf_col, None)
         score_value = str(row.get(score_col, "—")) if score_col else "—"
         fatal_value = str(row.get("fatal_flag", "")) if "fatal_flag" in section_df.columns else ""
-
-        decision_key = f"decision_{row_idx}"
-        override_key = f"override_{row_idx}"
 
         with st.container(border=True):
             st.markdown("**Incident**")
             st.write(full_text)
 
+            # Info bar: energy pred + conf, damage pred + conf, score, fatal flag
             info_cols = st.columns(4)
-            with info_cols[0]:
-                st.markdown(f"**Predicted:** `{pred_value}`")
-            with info_cols[1]:
-                if conf_value is not None:
-                    try:
-                        st.markdown(f"**Confidence:** `{float(conf_value):.2%}`")
-                    except (TypeError, ValueError):
-                        st.markdown(f"**Confidence:** `{conf_value}`")
-            with info_cols[2]:
+            ci = 0
+            if energy_pred_col:
+                with info_cols[ci]:
+                    st.markdown(f"**Energy:** `{row.get(energy_pred_col, '—')}`")
+                ci += 1
+                if energy_conf_col:
+                    e_conf = row.get(energy_conf_col)
+                    with info_cols[ci % 4]:
+                        try:
+                            st.markdown(f"**E. Conf:** `{float(e_conf):.2%}`")
+                        except (TypeError, ValueError):
+                            st.markdown(f"**E. Conf:** `{e_conf}`")
+                    ci += 1
+            if damage_pred_col:
+                with info_cols[ci % 4]:
+                    st.markdown(f"**Damage:** `{row.get(damage_pred_col, '—')}`")
+                ci += 1
+                if damage_conf_col:
+                    d_conf = row.get(damage_conf_col)
+                    with info_cols[ci % 4]:
+                        try:
+                            st.markdown(f"**D. Conf:** `{float(d_conf):.2%}`")
+                        except (TypeError, ValueError):
+                            st.markdown(f"**D. Conf:** `{d_conf}`")
+                    ci += 1
+            with info_cols[min(ci, 3)]:
                 st.markdown(f"**Score:** `{score_value}`")
-            with info_cols[3]:
-                if fatal_value == "YES":
+            if fatal_value == "YES":
+                with info_cols[min(ci + 1, 3)]:
                     st.markdown("⚠️ **Fatal flagged**")
 
-            dec_col, label_col = st.columns([1, 2])
-            with dec_col:
-                decision = st.selectbox(
-                    "Decision",
-                    ["Accept", "Override"],
-                    key=decision_key,
-                    index=None,
-                    placeholder="— choose decision —",
-                    label_visibility="collapsed",
-                )
-            with label_col:
-                if decision == "Override":
-                    st.selectbox(
-                        "Correct label",
-                        override_labels,
-                        key=override_key,
+            # Decision widget(s)
+            def _decision_widget(prefix: str, label_header: str, override_labels: list[str]) -> None:
+                st.markdown(f"**{label_header} decision**")
+                dec_col, lbl_col = st.columns([1, 2])
+                with dec_col:
+                    decision = st.selectbox(
+                        label_header,
+                        ["Accept", "Override"],
+                        key=f"{prefix}_decision_{row_idx}",
+                        index=None,
+                        placeholder="— choose —",
                         label_visibility="collapsed",
                     )
-                elif decision == "Accept":
-                    st.caption("✓ Accepting prediction as-is")
-                else:
-                    st.caption("☐ Not yet reviewed")
+                with lbl_col:
+                    if decision == "Override":
+                        st.selectbox(
+                            "Correct label",
+                            override_labels,
+                            key=f"{prefix}_override_{row_idx}",
+                            label_visibility="collapsed",
+                        )
+                    elif decision == "Accept":
+                        st.caption(f"✓ Accepting {label_header.lower()} prediction")
+                    else:
+                        st.caption(f"☐ {label_header} not yet reviewed")
+
+            if energy_pred_col:
+                _decision_widget("energy", "Energy", energy_labels)
+            if damage_pred_col:
+                _decision_widget("damage", "Damage", damage_labels)
 
     if st.button("Confirm & Next →", key=f"confirm_{section_key}", type="primary"):
         confirmed.update(batch_rows.index.tolist())
@@ -221,19 +258,23 @@ def _review_section(
 def _already_reviewed_section(
     review_df: pd.DataFrame,
     text_col: str,
-    pred_col: str | None,
+    energy_pred_col: str | None,
+    damage_pred_col: str | None,
 ) -> None:
     confirmed = _confirmed_rows()
     if not confirmed:
         return
 
     rows = review_df[review_df.index.isin(confirmed)].copy()
-    rows[_DECISION_COL] = [_decision_for(i) for i in rows.index]
-
     display_cols = [text_col]
-    if pred_col and pred_col in rows.columns:
-        display_cols.append(pred_col)
-    display_cols.append(_DECISION_COL)
+    if energy_pred_col and energy_pred_col in rows.columns:
+        display_cols.append(energy_pred_col)
+        rows[_ENERGY_DECISION_COL] = [_decision_for(i, "energy") for i in rows.index]
+        display_cols.append(_ENERGY_DECISION_COL)
+    if damage_pred_col and damage_pred_col in rows.columns:
+        display_cols.append(damage_pred_col)
+        rows[_DAMAGE_DECISION_COL] = [_decision_for(i, "damage") for i in rows.index]
+        display_cols.append(_DAMAGE_DECISION_COL)
 
     with st.expander(f"✅ Already Reviewed ({len(rows)} rows)", expanded=False):
         st.dataframe(rows[display_cols], use_container_width=True)
@@ -259,9 +300,10 @@ if input_mode == "Upload CSV":
         st.session_state["review_df"] = df_loaded
         for key in ("batch_fatal", "batch_high", "batch_medium", "batch_low"):
             st.session_state.pop(key, None)
-        if _DECISION_COL in df_loaded.columns:
+        resume_cols = [c for c in (_ENERGY_DECISION_COL, _DAMAGE_DECISION_COL) if c in df_loaded.columns]
+        if resume_cols:
             _restore_state_from_df(df_loaded)
-            already = df_loaded[_DECISION_COL].dropna().astype(str).str.strip().ne("").sum()
+            already = df_loaded[resume_cols[0]].dropna().astype(str).str.strip().ne("").sum()
             st.success(f"Loaded {len(df_loaded)} rows — resuming with {already} already reviewed.")
         else:
             st.session_state["confirmed_rows"] = set()
@@ -328,10 +370,11 @@ medium_df = tiers["medium"]
 low_df = tiers["low"]
 
 text_col = _text_col_guess(review_df)
-pred_col, pred_type = _pred_col_and_type(review_df)
-conf_col = _confidence_col(review_df, pred_type)
 score_col = _score_col(review_df)
-override_labels = labels.get(pred_type or "damage", labels["damage"])
+energy_pred_col, energy_conf_col = _energy_pred_info(review_df)
+damage_pred_col, damage_conf_col = _damage_pred_info(review_df)
+energy_labels: list[str] = labels.get("energy", labels["damage"])
+damage_labels: list[str] = labels.get("damage", labels["damage"])
 
 # ── Summary bar ────────────────────────────────────────────────────────────────
 
@@ -369,12 +412,23 @@ st.divider()
 
 # ── Already reviewed ───────────────────────────────────────────────────────────
 
-_already_reviewed_section(review_df, text_col, pred_col)
+_already_reviewed_section(review_df, text_col, energy_pred_col, damage_pred_col)
 
 # ── Pending review sections ────────────────────────────────────────────────────
 
+_section_kwargs = dict(
+    text_col=text_col,
+    score_col=score_col,
+    energy_pred_col=energy_pred_col,
+    energy_conf_col=energy_conf_col,
+    energy_labels=energy_labels,
+    damage_pred_col=damage_pred_col,
+    damage_conf_col=damage_conf_col,
+    damage_labels=damage_labels,
+)
+
 with st.expander(f"🔴 Fatal — Mandatory Review ({len(fatal_df)} rows)", expanded=True):
-    _review_section("fatal", fatal_df, text_col, pred_col, conf_col, score_col, override_labels)
+    _review_section("fatal", fatal_df, **_section_kwargs)
 
 _high_pct = st.session_state.get("settings_high_sample_pct", 10)
 with st.expander(
@@ -385,13 +439,13 @@ with st.expander(
         st.caption(
             f"Showing {len(high_sample)} rows sampled from {high_total} HIGH-confidence predictions ({_high_pct}% spot-check)."
         )
-    _review_section("high", high_sample, text_col, pred_col, conf_col, score_col, override_labels)
+    _review_section("high", high_sample, **_section_kwargs)
 
 with st.expander(f"🟠 MEDIUM Confidence — Light Review ({len(medium_df)} rows)", expanded=True):
-    _review_section("medium", medium_df, text_col, pred_col, conf_col, score_col, override_labels)
+    _review_section("medium", medium_df, **_section_kwargs)
 
 with st.expander(f"🔵 LOW Confidence — Full Manual Classification ({len(low_df)} rows)", expanded=True):
-    _review_section("low", low_df, text_col, pred_col, conf_col, score_col, override_labels)
+    _review_section("low", low_df, **_section_kwargs)
 
 # ── Final export ───────────────────────────────────────────────────────────────
 

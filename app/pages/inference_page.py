@@ -18,7 +18,7 @@ _NONE_LABEL = "— none —"
 
 def _build_model_selectbox(label: str, task_filter: str, sort_by: str) -> tuple[str, str | None]:
     entries = list_trained_models(task_filter=task_filter)
-    entries.sort(key=lambda e: _sort_key(e, sort_by))
+    entries.sort(key=lambda e: _sort_key(e, sort_by), reverse=True)
     options = [_NONE_LABEL] + [e.label for e in entries]
     paths = {e.label: str(e.path) for e in entries}
 
@@ -49,8 +49,26 @@ def _sort_key(entry, sort_by: str):
     try:
         with open(summaries[0], encoding="utf-8") as f:
             s = json.load(f)
-        val = s.get(sort_by) or s.get("history", {}).get(sort_by, 0.0)
-        return float(val) if val is not None else 0.0
+
+        # Top-level scalars (e.g. training_time_sec)
+        if sort_by in s and not isinstance(s[sort_by], (dict, list)):
+            return float(s[sort_by]) if s[sort_by] is not None else 0.0
+
+        # val_X → history.training.val.X (best value across epochs)
+        if sort_by.startswith("val_"):
+            metric = sort_by[4:]
+            vals = s.get("history", {}).get("training", {}).get("val", {}).get(metric, [])
+            return max((float(v) for v in vals if v is not None), default=0.0)
+
+        # test_X → history.test.X (scalar or single-element list)
+        if sort_by.startswith("test_"):
+            metric = sort_by[5:]
+            val = s.get("history", {}).get("test", {}).get(metric)
+            if isinstance(val, list):
+                return max((float(v) for v in val if v is not None), default=0.0)
+            return float(val) if val is not None else 0.0
+
+        return 0.0
     except Exception:
         return 0.0
 

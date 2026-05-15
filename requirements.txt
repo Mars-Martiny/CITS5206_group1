@@ -1,0 +1,16 @@
+pandas
+pytest
+click
+rich
+contractions
+spacy
+torch
+transformers
+huggingface_hub
+matplotlib
+seaborn
+numpy
+streamlit>=1.35
+scikit-learn
+optuna
+sphinx

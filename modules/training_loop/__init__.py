@@ -3,7 +3,7 @@
 from .config import _build_train_config
 from .train_loop import train_model_loop
 
-__all__ = ["training", "_build_train_config", "train_model_loop", ]
+__all__ = ["training", "_build_train_config", "train_model_loop"]
 
 """
 TRAINING LOOP MODULE // Files related to the main training loop and its components

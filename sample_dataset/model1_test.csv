@@ -1,0 +1,11 @@
+Reference,Date and Time of Event,Detailed Description of Event,Energy Type,Type of Potential Damage,Source
+SAM-006,2026-03-02 11:20,Worker was struck by a hand tool being passed between workers.,Human,Temporary / Minor Damage,Synthetic sample
+SAM-007,2026-03-02 15:05,Worker experienced severe distress after a workplace incident.,Human,Permanent Disabling Injury,Synthetic sample
+SAM-013,2026-03-04 14:20,A heavy object fell vertically and struck a worker on the head.,Gravitational,Fatal,Synthetic sample
+SAM-014,2026-03-05 08:05,Worker stepped into a lower level opening and fell.,Gravitational,Permanent Disabling Injury,Synthetic sample
+SAM-021,2026-03-07 12:50,Vehicle contacted a parked trailer during reversing.,Vehicular,Temporary / Minor Damage,Synthetic sample
+SAM-032,2026-03-11 11:45,Worker was hit by a small object that bounced from the floor.,Object,Temporary / Minor Damage,Synthetic sample
+SAM-038,2026-03-13 14:50,Worker entered a confined area with low oxygen.,Chemical,Fatal,Synthetic sample
+SAM-042,2026-03-15 13:30,Pressure vessel released suddenly during work.,Pressure,Fatal,Synthetic sample
+SAM-045,2026-03-16 14:20,Worker had a reaction after contact with a known allergen.,Susceptible Part,Temporary / Minor Damage,Synthetic sample
+SAM-048,2026-03-17 13:25,Worker was exposed to low level radiation during inspection.,Radiation,Temporary / Minor Damage,Synthetic sample

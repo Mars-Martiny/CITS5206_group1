@@ -1,0 +1,11 @@
+Reference,Date and Time of Event,Detailed Description of Event,Energy Type,Type of Potential Damage,Source
+SAM-005,2026-03-02 07:55,Worker made a sudden twisting movement and reported knee pain.,Human,Temporary / Minor Damage,Synthetic sample
+SAM-012,2026-03-04 10:30,A stored item fell from height and struck a worker.,Gravitational,Permanent Disabling Injury,Synthetic sample
+SAM-015,2026-03-05 11:55,Worker slipped but recovered without hitting the ground.,Gravitational,Temporary / Minor Damage,Synthetic sample
+SAM-020,2026-03-07 10:15,Driver hit head inside cabin while travelling over rough ground.,Vehicular,Temporary / Minor Damage,Synthetic sample
+SAM-022,2026-03-08 08:00,Vehicle went over an embankment and stopped on its side.,Vehicular,Permanent Disabling Injury,Synthetic sample
+SAM-027,2026-03-09 12:40,Worker felt hand vibration after using a powered tool for a long period.,Machine,Temporary / Minor Damage,Synthetic sample
+SAM-031,2026-03-11 08:35,Worker was hit by a pressurised cap that released suddenly.,Object,Permanent Disabling Injury,Synthetic sample
+SAM-035,2026-03-12 15:15,Worker touched an energised portable appliance.,Electrical,Permanent Disabling Injury,Synthetic sample
+SAM-040,2026-03-14 12:10,Worker handled a very cold object and injured fingers.,Thermal,Temporary / Minor Damage,Synthetic sample
+SAM-050,2026-03-18 11:30,Incident report did not contain enough detail to identify the energy type.,Insufficient Information,Temporary / Minor Damage,Synthetic sample

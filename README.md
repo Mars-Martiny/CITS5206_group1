@@ -102,6 +102,7 @@ For AMD GPUs (ROCm):
 ```bash
 pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm7.0
 ```
+>> Please note that rocm support is more limited compared to Nvidia CUDA. Check the devices list here: [https://rocm.docs.amd.com/en/docs-7.0.0/compatibility/compatibility-matrix.html](https://rocm.docs.amd.com/en/docs-7.0.0/compatibility/compatibility-matrix.html)
 
 ---
 

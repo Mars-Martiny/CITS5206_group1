@@ -1,129 +1,378 @@
-# Capstone Project — Incident Classifier
+# Capstone Project — Incident Classifier  
+## Facilitator Run Guide
 
-Requires **conda** and **Python 3.12 or higher**.
+This guide is intended for the project facilitator/marker to run and validate the repository for demonstration and assessment purposes.
 
----
-
-## Table of Contents
-
-- [User Guide](#user-guide)
-  - [Setup](#setup)
-    - [Prerequisites](#prerequisites)
-    - [Automatic (Recommended)](#automatic-recommended)
-      - [Linux / macOS](#linux--macos)
-      - [Windows](#windows)
-    - [Manual](#manual)
-  - [Running the Web UI](#running-the-web-ui)
-    - [Linux / macOS](#linux--macos-1)
-    - [Windows](#windows-1)
-    - [Manual](#manual-1)
-  - [CLI Usage](#cli-usage)
-    - [`train` — Fine-tune a model](#train--fine-tune-a-model)
-    - [`infer` — Batch inference](#infer--batch-inference)
-    - [`metrics` — Inspect the leaderboard](#metrics--inspect-the-leaderboard)
-  - [Building Code Documentation](#building-code-documentation)
-    - [Linux / macOS](#linux--macos-2)
-    - [Windows](#windows-2)
-    - [Manual](#manual-2)
-- [Developer / Maintainer Guide](#developer--maintainer-guide)
-  - [Code Style](#code-style)
-  - [Naming Conventions](#naming-conventions)
-  - [Development Workflow](#development-workflow)
-    - [Branch Structure](#branch-structure)
-    - [Starting a Feature](#starting-a-feature)
-    - [Before Creating a Pull Request](#before-creating-a-pull-request)
-    - [Sprint / Iteration Release](#sprint--iteration-release)
-  - [Notebook Synchronization](#notebook-synchronization)
-  - [Module Placement](#module-placement)
+> **Important note about the dataset:**  
+> The original project dataset is not included in this GitHub repository due to NDA and confidentiality restrictions.  
+> For marking and demonstration, this branch includes a small **synthetic sample dataset** with the same expected column structure. This allows the repository to be installed, trained, tested, and validated without exposing client data.
 
 ---
 
-# User Guide
+## 1. Project Overview
 
-## Setup
+This project is a Health and Safety incident classification system. It classifies incident descriptions into:
 
-### Prerequisites
+- **Damaging Energy Type**
+- **Type of Potential Damage**
 
-- **conda** — [Installation guide](https://docs.conda.io/projects/conda/en/stable/user-guide/install/index.html)
-- **Python 3.12+**
+The system supports:
 
-### Automatic (Recommended)
+- Data preprocessing
+- Model training
+- Batch inference
+- Model evaluation/leaderboard inspection
+- Streamlit Web UI demonstration
+- CLI-based usage
 
-The installer detects your GPU, creates a conda environment named `hs_classifier`, installs all dependencies with the correct PyTorch build, and downloads the spaCy model.
+The sample dataset is only for demonstration. It is not intended to represent the real client dataset or final production performance.
 
-#### Linux / macOS
+---
 
-> Tested on Linux. Should also work on macOS, but this has not been verified.
+## 2. Repository Branch for Facilitator Use
 
-If the scripts are not executable, run this once first:
+Please use the facilitator release branch:
+
+```bash
+git checkout release/facilitator_use
+```
+
+This branch contains:
+
+- Source code required to run the system
+- Installation scripts
+- CLI commands
+- Web UI
+- Synthetic sample train/validation/test datasets
+- Documentation for setup and demonstration
+
+---
+
+## 3. Prerequisites
+
+Before running the project, please ensure the following are installed:
+
+- **conda**
+- **Python 3.12 or higher**
+
+You can check your Python version using:
+
+```bash
+python --version
+```
+
+---
+
+## 4. Setup Instructions
+
+### Option A: Automatic Setup — Recommended
+
+The installer creates a conda environment named:
+
+```bash
+hs_classifier
+```
+
+It also installs the required Python packages and downloads the required spaCy model.
+
+### Linux / macOS
+
+If the shell scripts are not executable, run:
 
 ```bash
 chmod +x install.sh run_ui.sh build_docs.sh
 ```
 
+Then run:
+
 ```bash
-./install.sh          # first-time setup
-./install.sh --force  # reinstall from scratch
+./install.sh
 ```
 
-#### Windows
+To reinstall from scratch:
 
-> The `.bat` scripts are AI-converted from the tested `.sh` scripts and have **not** been tested. Use with caution.
+```bash
+./install.sh --force
+```
+
+### Windows
+
+> The Windows `.bat` scripts are converted from the tested shell scripts and may require manual troubleshooting.
 
 ```bat
-install.bat           :: first-time setup
-install.bat --force   :: reinstall from scratch
+install.bat
 ```
 
-### Manual
+To reinstall from scratch:
 
-Create and activate a conda environment, then install dependencies:
+```bat
+install.bat --force
+```
+
+---
+
+### Option B: Manual Setup
+
+Create and activate the conda environment:
 
 ```bash
 conda create -n hs_classifier python=3.12 -y
 conda activate hs_classifier
+```
+
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
 ```
 
-Install the spaCy lemmatizer model:
+Install the spaCy English model:
 
 ```bash
 python -m spacy download en_core_web_sm
 ```
 
-**GPU acceleration (optional)**
+---
 
-For NVIDIA GPUs (CUDA):
-```bash
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu130
+## 5. Sample Dataset
+
+The real client dataset is excluded from the repository due to NDA restrictions.
+
+For demonstration, this branch includes a small synthetic dataset using the same column format expected by the project.
+
+Expected dataset columns:
+
+```text
+Reference,
+Date and Time of Event,
+Detailed Description of Event,
+Energy Type,
+Type of Potential Damage,
+Source
 ```
 
-For AMD GPUs (ROCm):
-```bash
-pip install torch torchvision --index-url https://download.pytorch.org/whl/rocm7.0
+Sample dataset files:
+
+```text
+sample_dataset/model1_train.csv
+sample_dataset/model1_valid.csv
+sample_dataset/model1_test.csv
 ```
+
+These files are used to demonstrate that the repository can run end-to-end.
 
 ---
 
-## Running the Web UI
+## 6. Running the Web UI
 
-#### Linux / macOS
+The Web UI is built using Streamlit.
 
-Runs the installer automatically if not yet set up:
+### Linux / macOS
 
 ```bash
 ./run_ui.sh
 ```
 
-#### Windows
-
-> AI-converted from the tested `.sh` script and has **not** been tested. Use with caution.
+### Windows
 
 ```bat
 run_ui.bat
 ```
 
-#### Manual
+### Manual
+
+Make sure the environment is activated:
+
+```bash
+conda activate hs_classifier
+```
+
+Then run:
+
+```bash
+streamlit run app/app.py
+```
+
+The terminal will display a local URL, usually similar to:
+
+```text
+http://localhost:8501
+```
+
+Open this link in a browser to use the interface.
+
+---
+
+## 7. Running the Project from CLI
+
+The project can also be run using the command line interface:
+
+```bash
+python cli.py [COMMAND] [OPTIONS]
+```
+
+To see all available commands:
+
+```bash
+python cli.py -h
+```
+
+---
+
+## 8. Training a Model
+
+The `train` command trains a model using the sample dataset.
+
+General command format:
+
+```bash
+python cli.py train \
+  --train sample_dataset/model1_train.csv \
+  --valid sample_dataset/model1_valid.csv \
+  --test sample_dataset/model1_test.csv \
+  --model-type energy \
+  --architecture tf_idf
+```
+
+Recommended facilitator test command:
+
+```bash
+python cli.py train \
+  --train sample_dataset/model1_train.csv \
+  --valid sample_dataset/model1_valid.csv \
+  --test sample_dataset/model1_test.csv \
+  --model-type energy \
+  --architecture tf_idf
+```
+
+This command is recommended for quick validation because TF-IDF is lightweight and does not require GPU acceleration.
+
+On completion, the system should print:
+
+- The saved model directory
+- The best tracked metric
+- Evaluation results
+
+Saved models are written to:
+
+```text
+trained_models/
+```
+
+---
+
+## 9. Running Batch Inference
+
+After training a model, use the saved model directory for inference.
+
+General format:
+
+```bash
+python cli.py infer \
+  --dataset sample_dataset/model1_test.csv \
+  --output results.csv \
+  --energy-model path/to/saved/model_directory
+```
+
+Example:
+
+```bash
+python cli.py infer \
+  --dataset sample_dataset/model1_test.csv \
+  --output results.csv \
+  --energy-model trained_models/<saved_model_directory>
+```
+
+Replace:
+
+```text
+<saved_model_directory>
+```
+
+with the actual folder created inside `trained_models/`.
+
+The output file will be saved as:
+
+```text
+results.csv
+```
+
+The output includes prediction labels, confidence values, and confidence/action tiers.
+
+---
+
+## 10. Inspecting Model Metrics
+
+To inspect the leaderboard:
+
+```bash
+python cli.py metrics
+```
+
+To show the top 10 energy classification runs sorted by test F1 macro:
+
+```bash
+python cli.py metrics \
+  --model-type energy \
+  --sort-by test_f1_macro \
+  --top 10
+```
+
+To inspect a specific saved run:
+
+```bash
+python cli.py metrics --model-dir trained_models/<saved_model_directory>
+```
+
+---
+
+## 11. Recommended Facilitator Demonstration Flow
+
+For marking, the following sequence can be used to quickly verify that the project runs:
+
+```bash
+git checkout release/facilitator_use
+```
+
+Install dependencies:
+
+```bash
+./install.sh
+```
+
+Activate the environment if needed:
+
+```bash
+conda activate hs_classifier
+```
+
+Train a lightweight model:
+
+```bash
+python cli.py train \
+  --train sample_dataset/model1_train.csv \
+  --valid sample_dataset/model1_valid.csv \
+  --test sample_dataset/model1_test.csv \
+  --model-type energy \
+  --architecture tf_idf
+```
+
+Run inference using the saved model:
+
+```bash
+python cli.py infer \
+  --dataset sample_dataset/model1_test.csv \
+  --output results.csv \
+  --energy-model trained_models/<saved_model_directory>
+```
+
+Inspect metrics:
+
+```bash
+python cli.py metrics
+```
+
+Optionally run the Web UI:
 
 ```bash
 streamlit run app/app.py
@@ -131,275 +380,134 @@ streamlit run app/app.py
 
 ---
 
-## CLI Usage
+## 12. Notes on Model Performance
 
-```
-python cli.py [COMMAND] [OPTIONS]
-```
+The included sample dataset is synthetic and very small. Therefore:
 
-Global help: `python cli.py -h`
-
-### `train` — Fine-tune a model
-
-```bash
-python cli.py train \
-  --train data/train.csv \
-  --valid data/valid.csv \
-  --test  data/test.csv \
-  --model-type  <energy|damage> \
-  --architecture <tf_idf|bigru|bert|looped_transformer>
-```
-
-Example:
-```bash
-python cli.py train \
-  --train dataset/model1_train.csv \
-  --valid dataset/model1_valid.csv \
-  --test  dataset/model1_test.csv \
-  --model-type  energy \
-  --architecture tf_idf
-```
-
-**Optional flags:**
-
-| Flag | Description |
-|---|---|
-| `--text-col TEXT` | Column name for input text (default: `description`) |
-| `--epochs N` | Number of training epochs |
-| `--lr FLOAT` | Learning rate |
-| `--patience N` | Early-stopping patience |
-| `--hidden-dim N` | Hidden layer size |
-| `--batch-size N` | Mini-batch size |
-| `--embedding-type` | BiGRU only: `none`, `static`, or `contextual` |
-| `--num-loops N` | Looped transformer only: number of loops |
-| `--fine-tune` | Enable fine-tuning mode (flag, no value needed) |
-
-Prints the artifacts directory and best tracked metric on completion.
-
-### `infer` — Batch inference
-
-```bash
-python cli.py infer \
-  --dataset data/unlabelled.csv \
-  --output  results.csv \
-  [--energy-model path/to/energy_run] \
-  [--damage-model path/to/damage_run]
-```
-
-Example:
-```bash
-python cli.py infer \
-  --dataset dataset/model1_test.csv \
-  --output  results.csv \
-  --energy-model trained_models/20260514_203159_tf_idf
-```
-
-
-At least one of `--energy-model` or `--damage-model` must be supplied. The output CSV includes confidence tiers and action columns. Prints row counts and tier distributions.
-
-### `metrics` — Inspect the leaderboard
-
-```bash
-# Show top 20 runs sorted by val_f1_macro
-python cli.py metrics
-
-# Filter and sort
-python cli.py metrics --model-type energy --architecture bert --sort-by test_f1_macro --top 10
-
-# Dump a single run's full details (WARNING: BIG FILE)
-python cli.py metrics --model-dir path/to/run
-```
-
-**Optional flags:**
-
-| Flag | Description |
-|---|---|
-| `--sort-by COL` | Column to sort by (default: `val_f1_macro`) |
-| `--ascending` | Sort ascending instead of descending |
-| `--model-type` | Filter by `energy` or `damage` |
-| `--architecture` | Filter by architecture name |
-| `--top N` | Number of rows to show (default: `20`) |
-| `--model-dir PATH` | Dump JSON details for a single saved run |
-
-Renders a rich table if the `rich` package is installed, otherwise falls back to plain text.
+- The results are only for repository validation.
+- The metrics should not be interpreted as real project performance.
+- The sample data is included so the facilitator can confirm that the codebase runs correctly.
+- Real model performance was evaluated separately using the confidential client dataset.
 
 ---
 
-## Building Code Documentation
+## 13. Troubleshooting
 
-#### Linux / macOS
+### Conda environment not found
+
+Activate the environment manually:
+
+```bash
+conda activate hs_classifier
+```
+
+If it does not exist, rerun:
+
+```bash
+./install.sh
+```
+
+or manually create it:
+
+```bash
+conda create -n hs_classifier python=3.12 -y
+conda activate hs_classifier
+pip install -r requirements.txt
+```
+
+---
+
+### Missing spaCy model
+
+If you see an error related to `en_core_web_sm`, run:
+
+```bash
+python -m spacy download en_core_web_sm
+```
+
+---
+
+### Streamlit command not found
+
+Make sure the environment is activated:
+
+```bash
+conda activate hs_classifier
+```
+
+Then reinstall dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+### Model path error during inference
+
+Inference requires a previously trained model directory.
+
+First train a model:
+
+```bash
+python cli.py train \
+  --train sample_dataset/model1_train.csv \
+  --valid sample_dataset/model1_valid.csv \
+  --test sample_dataset/model1_test.csv \
+  --model-type energy \
+  --architecture tf_idf
+```
+
+Then copy the generated folder name from:
+
+```text
+trained_models/
+```
+
+Use that path in the inference command:
+
+```bash
+python cli.py infer \
+  --dataset sample_dataset/model1_test.csv \
+  --output results.csv \
+  --energy-model trained_models/<saved_model_directory>
+```
+
+---
+
+## 14. Building Code Documentation
+
+To build the code documentation:
+
+### Linux / macOS
 
 ```bash
 ./build_docs.sh
 ```
 
-#### Windows
-
-> AI-converted from the tested `.sh` script and has **not** been tested. Use with caution.
+### Windows
 
 ```bat
 build_docs.bat
 ```
 
-#### Manual
+### Manual
 
 ```bash
 cd docs
 make html
 ```
 
-Output is written to `docs/build/html/index.html`.
+The generated documentation will be available at:
+
+```text
+docs/build/html/index.html
+```
 
 ---
 
-# Developer / Maintainer Guide
+## 15. Confidentiality Statement
 
-## Code Style
+The original incident dataset belongs to the client and is excluded from this repository due to NDA and confidentiality requirements.
 
-Install the linting and hook tools:
-
-```bash
-pip install ruff pre-commit
-```
-
-Install the pre-commit hooks (run once after cloning):
-
-```bash
-pre-commit install
-```
-
-Ruff will now run automatically on every `git commit`. To run it manually:
-
-```bash
-# check for lint errors
-python -m ruff check .
-
-# auto-fix lint errors
-python -m ruff check . --fix
-```
-
-> **Easy to miss:** After fixing lint errors, you must re-stage the changed files with `git add` before committing. Pre-commit only checks staged files — if the fixed files aren't staged, the commit will keep failing even though the errors are gone.
-
----
-
-## Naming Conventions
-
-| Type | Convention | Example |
-|---|---|---|
-| Variables | snake_case | `data_frame` |
-| Functions | snake_case | `load_dataset()` |
-| Constants | PascalCase | `ModelConfig` |
-| Public Classes / Interfaces | PascalCase | `DataProcessor` |
-| Private/Internal Functions | `_underscored_snake_case` | `_internal_helper()` |
-
-Unused variables can use a bare underscore: `_, b = (0, 2.36)`
-
----
-
-## Development Workflow
-
-This repository follows a Git Flow–inspired workflow.
-
-**Branch flow:**
-```
-dev → feature → PR → dev → release PR → main
-```
-
-### Branch Structure
-
-| Branch | Purpose |
-|---|---|
-| `main` | Stable, production-ready code. Protected — no direct pushes. |
-| `dev` | Integration branch. All feature work merges here first. Protected. |
-| `feature/...` | Short-lived branches created from `dev`. |
-
-Feature branch naming format:
-```
-feature/#<ticketNo>-<short-description>
-```
-Example: `feature/#42-risk-classification`
-
-### Starting a Feature
-
-```bash
-git checkout dev
-git pull origin dev
-git checkout -b feature/#<ticketNo>-<short-description>
-```
-
-### Before Creating a Pull Request
-
-Sync your branch with the latest `dev` to avoid merge conflicts:
-
-```bash
-git checkout dev
-git pull origin dev
-git checkout feature/#<ticketNo>-<feature-name>
-git merge dev
-```
-
-Open a Pull Request: `feature/... → dev`
-
-Include in the PR description: what was implemented and any notes for reviewers. At least one team member approval is required.
-
-### Sprint / Iteration Release
-
-At the end of a sprint:
-
-1. Create a PR: `dev → main`
-2. Review and approve.
-3. Merge into `main`.
-4. Back-merge `main → dev` to keep them in sync.
-
----
-
-## Notebook Synchronization
-
-Install jupytext:
-
-```bash
-conda install jupytext -c conda-forge
-```
-
-The `main_notebook` is already configured as a paired notebook. To sync before and after making changes:
-
-```bash
-# Sync notebook from the paired .py file (before starting work)
-jupytext --sync main_notebook.py
-
-# Sync notebook after making changes
-jupytext --sync main_notebook.ipynb
-```
-
-Always synchronize the notebook before committing. Failure to do so may cause merge conflicts or lost notebook changes.
-
----
-
-## Module Placement
-
-Keep the repository modular to minimize conflicts and keep the notebook concise.
-
-```
-├── main_notebook.ipynb
-├── main_notebook.py
-├── modules
-│   ├── misc
-│   │   └── example.py
-│   └── pre_processing
-├── README.md
-```
-
-Place reusable logic in modules rather than inline in the notebook:
-
-```python
-# modules/misc/example.py
-def print_hello_world():
-    print("Hello World")
-```
-
-```python
-# In the notebook
-from modules.misc.example import print_hello_world
-
-print_hello_world()
-```
+The synthetic sample dataset in this branch is only provided to support marking, demonstration, and reproducibility of the code execution process.

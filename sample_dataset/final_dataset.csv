@@ -1,51 +1,79 @@
 Reference,Date and Time of Event,Detailed Description of Event,Energy Type,Type of Potential Damage,Source
-SAM-001,2026-03-01 08:10,Worker lifted a box from the floor and reported lower back pain.,Human,Temporary / Minor Damage,Synthetic sample
-SAM-002,2026-03-01 09:25,Worker pushed a loaded trolley and felt shoulder strain.,Human,Temporary / Minor Damage,Synthetic sample
-SAM-003,2026-03-01 10:40,Worker carried a component across the workshop and developed arm pain.,Human,Temporary / Minor Damage,Synthetic sample
-SAM-004,2026-03-01 12:15,Worker caught fingers between two manually handled items.,Human,Permanent Disabling Injury,Synthetic sample
-SAM-005,2026-03-02 07:55,Worker made a sudden twisting movement and reported knee pain.,Human,Temporary / Minor Damage,Synthetic sample
-SAM-006,2026-03-02 11:20,Worker was struck by a hand tool being passed between workers.,Human,Temporary / Minor Damage,Synthetic sample
-SAM-007,2026-03-02 15:05,Worker experienced severe distress after a workplace incident.,Human,Permanent Disabling Injury,Synthetic sample
-SAM-008,2026-03-03 08:30,Worker slipped on a wet floor and fell at the same level.,Gravitational,Temporary / Minor Damage,Synthetic sample
-SAM-009,2026-03-03 09:45,Worker tripped over a small object and landed on one knee.,Gravitational,Temporary / Minor Damage,Synthetic sample
-SAM-010,2026-03-03 13:10,Worker lost balance while descending steps and fell forward.,Gravitational,Temporary / Minor Damage,Synthetic sample
-SAM-011,2026-03-04 07:50,Worker fell from a ladder while climbing down.,Gravitational,Permanent Disabling Injury,Synthetic sample
-SAM-012,2026-03-04 10:30,A stored item fell from height and struck a worker.,Gravitational,Permanent Disabling Injury,Synthetic sample
-SAM-013,2026-03-04 14:20,A heavy object fell vertically and struck a worker on the head.,Gravitational,Fatal,Synthetic sample
-SAM-014,2026-03-05 08:05,Worker stepped into a lower level opening and fell.,Gravitational,Permanent Disabling Injury,Synthetic sample
-SAM-015,2026-03-05 11:55,Worker slipped but recovered without hitting the ground.,Gravitational,Temporary / Minor Damage,Synthetic sample
-SAM-016,2026-03-06 08:20,Mobile equipment struck a fixed barrier during movement.,Vehicular,Temporary / Minor Damage,Synthetic sample
-SAM-017,2026-03-06 09:35,Vehicle rolled onto its side while turning on uneven ground.,Vehicular,Permanent Disabling Injury,Synthetic sample
-SAM-018,2026-03-06 13:40,Vehicle struck another vehicle at low speed.,Vehicular,Temporary / Minor Damage,Synthetic sample
-SAM-019,2026-03-07 07:45,Worker was struck by a moving vehicle in a pedestrian area.,Vehicular,Fatal,Synthetic sample
-SAM-020,2026-03-07 10:15,Driver hit head inside cabin while travelling over rough ground.,Vehicular,Temporary / Minor Damage,Synthetic sample
-SAM-021,2026-03-07 12:50,Vehicle contacted a parked trailer during reversing.,Vehicular,Temporary / Minor Damage,Synthetic sample
-SAM-022,2026-03-08 08:00,Vehicle went over an embankment and stopped on its side.,Vehicular,Permanent Disabling Injury,Synthetic sample
-SAM-023,2026-03-08 09:30,Worker contacted a moving belt during cleaning.,Machine,Permanent Disabling Injury,Synthetic sample
-SAM-024,2026-03-08 11:10,Worker glove was caught in a rotating hand-held tool.,Machine,Permanent Disabling Injury,Synthetic sample
-SAM-025,2026-03-08 14:25,Worker was cut by a powered saw during use.,Machine,Temporary / Minor Damage,Synthetic sample
-SAM-026,2026-03-09 08:15,Worker was caught in moving machinery during operation.,Machine,Fatal,Synthetic sample
-SAM-027,2026-03-09 12:40,Worker felt hand vibration after using a powered tool for a long period.,Machine,Temporary / Minor Damage,Synthetic sample
-SAM-028,2026-03-10 07:50,Worker was hit by an item thrown by another person.,Object,Temporary / Minor Damage,Synthetic sample
-SAM-029,2026-03-10 10:20,Worker was hit by a fragment released from a broken disc.,Object,Permanent Disabling Injury,Synthetic sample
-SAM-030,2026-03-10 13:05,Worker was struck by debris flicked from a moving vehicle tyre.,Object,Temporary / Minor Damage,Synthetic sample
-SAM-031,2026-03-11 08:35,Worker was hit by a pressurised cap that released suddenly.,Object,Permanent Disabling Injury,Synthetic sample
-SAM-032,2026-03-11 11:45,Worker was hit by a small object that bounced from the floor.,Object,Temporary / Minor Damage,Synthetic sample
-SAM-033,2026-03-12 07:40,Worker received an electric shock from a damaged extension lead.,Electrical,Temporary / Minor Damage,Synthetic sample
-SAM-034,2026-03-12 09:55,Worker contacted exposed wiring in a power circuit.,Electrical,Fatal,Synthetic sample
-SAM-035,2026-03-12 15:15,Worker touched an energised portable appliance.,Electrical,Permanent Disabling Injury,Synthetic sample
-SAM-036,2026-03-13 08:05,Worker inhaled fumes after a container leaked.,Chemical,Temporary / Minor Damage,Synthetic sample
-SAM-037,2026-03-13 10:30,Chemical splashed onto worker skin during handling.,Chemical,Temporary / Minor Damage,Synthetic sample
-SAM-038,2026-03-13 14:50,Worker entered a confined area with low oxygen.,Chemical,Fatal,Synthetic sample
-SAM-039,2026-03-14 07:55,Worker touched a hot metal surface after heating.,Thermal,Temporary / Minor Damage,Synthetic sample
-SAM-040,2026-03-14 12:10,Worker handled a very cold object and injured fingers.,Thermal,Temporary / Minor Damage,Synthetic sample
-SAM-041,2026-03-15 08:25,Pressurised hose released and struck a worker.,Pressure,Permanent Disabling Injury,Synthetic sample
-SAM-042,2026-03-15 13:30,Pressure vessel released suddenly during work.,Pressure,Fatal,Synthetic sample
-SAM-043,2026-03-16 09:05,Worker reported hearing discomfort after loud equipment noise.,Noise,Temporary / Minor Damage,Synthetic sample
-SAM-044,2026-03-16 11:40,Worker was punctured by a sharp edge during handling.,Specialized Shape,Temporary / Minor Damage,Synthetic sample
-SAM-045,2026-03-16 14:20,Worker had a reaction after contact with a known allergen.,Susceptible Part,Temporary / Minor Damage,Synthetic sample
-SAM-046,2026-03-17 08:15,Worker was bitten by an animal while working outdoors.,Animal,Temporary / Minor Damage,Synthetic sample
-SAM-047,2026-03-17 10:45,Worker was exposed to biological material during cleanup.,Biological,Temporary / Minor Damage,Synthetic sample
-SAM-048,2026-03-17 13:25,Worker was exposed to low level radiation during inspection.,Radiation,Temporary / Minor Damage,Synthetic sample
-SAM-049,2026-03-18 09:00,Incident involved damage energy that did not fit the listed groups.,Other,Temporary / Minor Damage,Synthetic sample
-SAM-050,2026-03-18 11:30,Incident report did not contain enough detail to identify the energy type.,Insufficient Information,Temporary / Minor Damage,Synthetic sample
+INC-001,2026-03-01 08:07,Worker was bitten by an animal near the work area.,Animal,Temporary / Minor Damage,Synthetic sample
+INC-002,2026-03-01 09:14,Worker was knocked over while moving away from an animal.,Animal,Permanent Disabling Injury,Synthetic sample
+INC-003,2026-03-01 10:21,Worker was seriously injured after contact with a large animal.,Animal,Fatal,Synthetic sample
+INC-004,2026-03-01 11:28,Worker handled contaminated material during cleanup.,Biological,Temporary / Minor Damage,Synthetic sample
+INC-005,2026-03-01 12:35,Worker was exposed to biological material through damaged gloves.,Biological,Permanent Disabling Injury,Synthetic sample
+INC-006,2026-03-01 13:42,Worker was exposed to hazardous biological matter in an enclosed area.,Biological,Fatal,Synthetic sample
+INC-007,2026-03-01 14:49,Worker inhaled fumes after a container leaked.,Chemical,Temporary / Minor Damage,Synthetic sample
+INC-008,2026-03-02 15:56,Worker splashed chemical onto skin while transferring liquid.,Chemical,Permanent Disabling Injury,Synthetic sample
+INC-009,2026-03-02 08:03,Worker was overcome by toxic gas in an enclosed area.,Chemical,Fatal,Synthetic sample
+INC-010,2026-03-02 09:10,Severe weather caused debris to hit a worker.,Disasters,Temporary / Minor Damage,Synthetic sample
+INC-011,2026-03-02 10:17,A sudden environmental event damaged the work area and injured a worker.,Disasters,Permanent Disabling Injury,Synthetic sample
+INC-012,2026-03-02 11:24,Worker was caught in a major environmental incident.,Disasters,Fatal,Synthetic sample
+INC-013,2026-03-02 12:31,Worker received a shock from a damaged extension lead.,Electrical,Temporary / Minor Damage,Synthetic sample
+INC-014,2026-03-02 13:38,Worker contacted exposed wiring during inspection.,Electrical,Permanent Disabling Injury,Synthetic sample
+INC-015,2026-03-03 14:45,Worker contacted a live power circuit.,Electrical,Fatal,Synthetic sample
+INC-016,2026-03-03 15:52,Worker slipped on a wet surface and fell at the same level.,Gravitational,Temporary / Minor Damage,Synthetic sample
+INC-017,2026-03-03 08:59,Worker fell from a ladder while descending from a platform.,Gravitational,Permanent Disabling Injury,Synthetic sample
+INC-018,2026-03-03 09:06,A heavy object fell from height and struck a worker.,Gravitational,Fatal,Synthetic sample
+INC-019,2026-03-03 10:13,Worker lifted a box from the floor and reported back strain.,Human,Temporary / Minor Damage,Synthetic sample
+INC-020,2026-03-03 11:20,Worker carried a heavy component and developed shoulder pain.,Human,Permanent Disabling Injury,Synthetic sample
+INC-021,2026-03-03 12:27,Worker collapsed after extreme physical exertion.,Human,Fatal,Synthetic sample
+INC-022,2026-03-04 13:34,Incident description did not provide enough detail to classify the energy.,Insufficient Information,Temporary / Minor Damage,Synthetic sample
+INC-023,2026-03-04 14:41,Report stated that a worker was injured but gave limited event details.,Insufficient Information,Permanent Disabling Injury,Synthetic sample
+INC-024,2026-03-04 15:48,Investigation record was incomplete for a serious injury event.,Insufficient Information,Fatal,Synthetic sample
+INC-025,2026-03-04 08:55,Worker's hand contacted a moving conveyor belt.,Machine,Temporary / Minor Damage,Synthetic sample
+INC-026,2026-03-04 09:02,Worker's glove was caught in a rotating drill.,Machine,Permanent Disabling Injury,Synthetic sample
+INC-027,2026-03-04 10:09,Worker was caught in powered machine components.,Machine,Fatal,Synthetic sample
+INC-028,2026-03-04 11:16,Worker reported ringing ears after exposure to loud impact noise.,Noise,Temporary / Minor Damage,Synthetic sample
+INC-029,2026-03-05 12:23,Worker was exposed to loud equipment noise over an extended period.,Noise,Permanent Disabling Injury,Synthetic sample
+INC-030,2026-03-05 13:30,Worker was exposed to an extreme noise event during equipment failure.,Noise,Fatal,Synthetic sample
+INC-031,2026-03-05 14:37,Worker was hit by a small part released from equipment.,Object,Temporary / Minor Damage,Synthetic sample
+INC-032,2026-03-05 15:44,A fragment from a grinding disc struck a worker.,Object,Permanent Disabling Injury,Synthetic sample
+INC-033,2026-03-05 08:51,Worker was struck by a high-energy flying object.,Object,Fatal,Synthetic sample
+INC-034,2026-03-05 09:58,Worker was injured in an event that did not fit the listed energy groups.,Other,Temporary / Minor Damage,Synthetic sample
+INC-035,2026-03-05 10:05,Worker received a serious injury from an unusual work activity.,Other,Permanent Disabling Injury,Synthetic sample
+INC-036,2026-03-06 11:12,Worker was fatally injured in an event outside the standard categories.,Other,Fatal,Synthetic sample
+INC-037,2026-03-06 12:19,Worker was struck by a hose after pressure was released unexpectedly.,Pressure,Temporary / Minor Damage,Synthetic sample
+INC-038,2026-03-06 13:26,Worker was hit by a sudden pressure release from a pipe.,Pressure,Permanent Disabling Injury,Synthetic sample
+INC-039,2026-03-06 14:33,Worker was exposed to a high-pressure release during maintenance.,Pressure,Fatal,Synthetic sample
+INC-040,2026-03-06 15:40,Worker was near a radiation source during routine inspection.,Radiation,Temporary / Minor Damage,Synthetic sample
+INC-041,2026-03-06 08:47,Worker was exposed to a radiation source during maintenance.,Radiation,Permanent Disabling Injury,Synthetic sample
+INC-042,2026-03-06 09:54,Worker received a severe exposure from a radiation source.,Radiation,Fatal,Synthetic sample
+INC-043,2026-03-07 10:01,Worker received a cut from a sharp sheet edge.,Specialized Shape,Temporary / Minor Damage,Synthetic sample
+INC-044,2026-03-07 11:08,Worker was punctured by a sharp tool during handling.,Specialized Shape,Permanent Disabling Injury,Synthetic sample
+INC-045,2026-03-07 12:15,Worker was severely injured by a sharp object.,Specialized Shape,Fatal,Synthetic sample
+INC-046,2026-03-07 13:22,Worker reacted after contact with a material affecting a sensitive area.,Susceptible Part,Temporary / Minor Damage,Synthetic sample
+INC-047,2026-03-07 14:29,Worker with a known sensitivity reacted to a substance on gloves.,Susceptible Part,Permanent Disabling Injury,Synthetic sample
+INC-048,2026-03-07 15:36,Worker suffered a severe reaction involving a susceptible body part.,Susceptible Part,Fatal,Synthetic sample
+INC-049,2026-03-07 08:43,Worker touched a hot metal surface after welding.,Thermal,Temporary / Minor Damage,Synthetic sample
+INC-050,2026-03-08 09:50,Worker was burned by steam released from a hose.,Thermal,Permanent Disabling Injury,Synthetic sample
+INC-051,2026-03-08 10:57,Worker was exposed to extreme heat during an incident.,Thermal,Fatal,Synthetic sample
+INC-052,2026-03-08 11:04,Mobile equipment struck a fixed barrier in the yard.,Vehicular,Temporary / Minor Damage,Synthetic sample
+INC-053,2026-03-08 12:11,A vehicle rolled onto its side while travelling over uneven ground.,Vehicular,Permanent Disabling Injury,Synthetic sample
+INC-054,2026-03-08 13:18,Worker was struck by a moving vehicle in a loading area.,Vehicular,Fatal,Synthetic sample
+INC-055,2026-03-08 14:25,Worker pushed a loaded trolley and felt arm strain.,Human,Temporary / Minor Damage,Synthetic sample
+INC-056,2026-03-08 15:32,Worker tripped on a raised edge and landed on the ground.,Gravitational,Temporary / Minor Damage,Synthetic sample
+INC-057,2026-03-09 08:39,Vehicle struck another vehicle during low-speed movement.,Vehicular,Temporary / Minor Damage,Synthetic sample
+INC-058,2026-03-09 09:46,Worker's finger was pinched between moving machine parts.,Machine,Permanent Disabling Injury,Synthetic sample
+INC-059,2026-03-09 10:53,Worker was hit by material ejected from under vehicle tyres.,Object,Temporary / Minor Damage,Synthetic sample
+INC-060,2026-03-09 11:00,Worker noticed irritation after contact with a cleaning substance.,Chemical,Temporary / Minor Damage,Synthetic sample
+INC-061,2026-03-09 12:07,Worker touched a faulty portable power tool.,Electrical,Permanent Disabling Injury,Synthetic sample
+INC-062,2026-03-09 13:14,Worker contacted a very cold pipe during maintenance.,Thermal,Temporary / Minor Damage,Synthetic sample
+INC-063,2026-03-09 14:21,Worker was sprayed by material from a pressurised line.,Pressure,Permanent Disabling Injury,Synthetic sample
+INC-064,2026-03-10 15:28,Worker experienced discomfort after a sudden loud noise.,Noise,Temporary / Minor Damage,Synthetic sample
+INC-065,2026-03-10 08:35,Worker was struck by loose material during a storm event.,Disasters,Fatal,Synthetic sample
+INC-066,2026-03-10 09:42,Worker cleaned a spill involving biological waste.,Biological,Temporary / Minor Damage,Synthetic sample
+INC-067,2026-03-10 10:49,Worker twisted while lowering a container and felt knee pain.,Human,Temporary / Minor Damage,Synthetic sample
+INC-068,2026-03-10 11:56,Worker slipped while stepping around equipment but recovered without falling.,Gravitational,Temporary / Minor Damage,Synthetic sample
+INC-069,2026-03-10 12:03,Vehicle reversed into a fixed object during yard movement.,Vehicular,Temporary / Minor Damage,Synthetic sample
+INC-070,2026-03-10 13:10,Worker contacted vibration from a powered tool for an extended period.,Machine,Temporary / Minor Damage,Synthetic sample
+INC-071,2026-03-11 14:17,Worker was hit by an object thrown during manual handling.,Object,Temporary / Minor Damage,Synthetic sample
+INC-072,2026-03-11 15:24,Worker handled material from a contaminated bin.,Biological,Permanent Disabling Injury,Synthetic sample
+INC-073,2026-03-11 08:31,Worker scratched a hand on a pointed metal edge.,Specialized Shape,Temporary / Minor Damage,Synthetic sample
+INC-074,2026-03-11 09:38,Worker developed irritation after contact with a substance.,Susceptible Part,Temporary / Minor Damage,Synthetic sample
+INC-075,2026-03-11 10:45,Worker entered an area with radiation warning signage.,Radiation,Permanent Disabling Injury,Synthetic sample
+INC-076,2026-03-11 11:52,Worker contacted damaged electrical equipment during setup.,Electrical,Temporary / Minor Damage,Synthetic sample
+INC-077,2026-03-11 12:59,Worker was exposed to concentrated chemical vapour.,Chemical,Fatal,Synthetic sample
+INC-078,2026-03-12 13:06,Worker was exposed to a pressure burst during maintenance.,Pressure,Fatal,Synthetic sample

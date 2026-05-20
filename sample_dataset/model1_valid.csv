@@ -1,11 +1,13 @@
 Reference,Date and Time of Event,Detailed Description of Event,Energy Type,Type of Potential Damage,Source
-SAM-005,2026-03-02 07:55,Worker made a sudden twisting movement and reported knee pain.,Human,Temporary / Minor Damage,Synthetic sample
-SAM-012,2026-03-04 10:30,A stored item fell from height and struck a worker.,Gravitational,Permanent Disabling Injury,Synthetic sample
-SAM-015,2026-03-05 11:55,Worker slipped but recovered without hitting the ground.,Gravitational,Temporary / Minor Damage,Synthetic sample
-SAM-020,2026-03-07 10:15,Driver hit head inside cabin while travelling over rough ground.,Vehicular,Temporary / Minor Damage,Synthetic sample
-SAM-022,2026-03-08 08:00,Vehicle went over an embankment and stopped on its side.,Vehicular,Permanent Disabling Injury,Synthetic sample
-SAM-027,2026-03-09 12:40,Worker felt hand vibration after using a powered tool for a long period.,Machine,Temporary / Minor Damage,Synthetic sample
-SAM-031,2026-03-11 08:35,Worker was hit by a pressurised cap that released suddenly.,Object,Permanent Disabling Injury,Synthetic sample
-SAM-035,2026-03-12 15:15,Worker touched an energised portable appliance.,Electrical,Permanent Disabling Injury,Synthetic sample
-SAM-040,2026-03-14 12:10,Worker handled a very cold object and injured fingers.,Thermal,Temporary / Minor Damage,Synthetic sample
-SAM-050,2026-03-18 11:30,Incident report did not contain enough detail to identify the energy type.,Insufficient Information,Temporary / Minor Damage,Synthetic sample
+INC-055,2026-03-08 14:25,Worker pushed a loaded trolley and felt arm strain.,Human,Temporary / Minor Damage,Synthetic sample
+INC-056,2026-03-08 15:32,Worker tripped on a raised edge and landed on the ground.,Gravitational,Temporary / Minor Damage,Synthetic sample
+INC-057,2026-03-09 08:39,Vehicle struck another vehicle during low-speed movement.,Vehicular,Temporary / Minor Damage,Synthetic sample
+INC-058,2026-03-09 09:46,Worker's finger was pinched between moving machine parts.,Machine,Permanent Disabling Injury,Synthetic sample
+INC-059,2026-03-09 10:53,Worker was hit by material ejected from under vehicle tyres.,Object,Temporary / Minor Damage,Synthetic sample
+INC-060,2026-03-09 11:00,Worker noticed irritation after contact with a cleaning substance.,Chemical,Temporary / Minor Damage,Synthetic sample
+INC-061,2026-03-09 12:07,Worker touched a faulty portable power tool.,Electrical,Permanent Disabling Injury,Synthetic sample
+INC-062,2026-03-09 13:14,Worker contacted a very cold pipe during maintenance.,Thermal,Temporary / Minor Damage,Synthetic sample
+INC-063,2026-03-09 14:21,Worker was sprayed by material from a pressurised line.,Pressure,Permanent Disabling Injury,Synthetic sample
+INC-064,2026-03-10 15:28,Worker experienced discomfort after a sudden loud noise.,Noise,Temporary / Minor Damage,Synthetic sample
+INC-065,2026-03-10 08:35,Worker was struck by loose material during a storm event.,Disasters,Fatal,Synthetic sample
+INC-066,2026-03-10 09:42,Worker cleaned a spill involving biological waste.,Biological,Temporary / Minor Damage,Synthetic sample

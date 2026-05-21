@@ -4,7 +4,7 @@
 This guide is intended for the project facilitator/marker to run and validate the repository for demonstration and assessment purposes.
 
 > **Important note about the dataset:**  
-> The original project dataset is not included in this GitHub repository due to NDA and confidentiality restrictions.  
+> The original project dataset is not included in this GitHub repository due to NDA and confidentiality restrictions.
 > For marking and demonstration, this branch includes a small **synthetic sample dataset** with the same expected column structure. This allows the repository to be installed, trained, tested, and validated without exposing client data.
 > The sample records were manually generated using the examples of different damaging energy types described in the `InterSafe` damaging energy classification document. Each row contains a generic incident description, an assigned damaging energy category: `Human, Gravitational, Vehicular, Machine, Object, etc.`, and a simplified potential damage label: `Temporary / Minor Damage, Permanent Disabling Injury, or Fatal`. The dataset is not intended to represent real incidents or model performance, but to allow the repository, preprocessing pipeline, model training, and evaluation workflow to run end-to-end with data in the expected project format.
 
@@ -35,7 +35,7 @@ The sample dataset is only for demonstration. It is not intended to represent th
 Please use the facilitator release branch:
 
 ```bash
-git checkout release/facilitator_use
+git checkout feat/facilitator_use
 ```
 
 This branch contains:

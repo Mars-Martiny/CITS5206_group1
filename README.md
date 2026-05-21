@@ -332,7 +332,7 @@ python cli.py metrics --model-dir trained_models/<saved_model_directory>
 For marking, the following sequence can be used to quickly verify that the project runs:
 
 ```bash
-git checkout release/facilitator_use
+git checkout feat/facilitator_use
 ```
 
 Install dependencies:

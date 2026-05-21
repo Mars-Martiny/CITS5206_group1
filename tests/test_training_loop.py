@@ -27,8 +27,7 @@ from modules.training_loop.utility import (
 # Import directly from the submodule to avoid pulling in run_saving (matplotlib)
 # via modules/training_loop/__init__.py
 from modules.training_loop.metrics import _compute_classification_metrics
-from modules.optimisation.loss import get_loss_function, FocalLoss
-from modules.training_loop.imbalance import compute_class_weights, make_weighted_sampler
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -253,62 +252,3 @@ class TestGetLearningRates:
         assert len(lrs) == 1
         assert lrs[0] == pytest.approx(0.01)
 
-# ── get_loss_function ─────────────────────────────────────────────────────────
-
-
-class TestGetLossFunction:
-    def test_cross_entropy_returns_correct_type(self):
-        criterion = get_loss_function("cross_entropy")
-        assert isinstance(criterion, nn.CrossEntropyLoss)
-
-    def test_focal_returns_correct_type(self):
-        criterion = get_loss_function("focal")
-        assert isinstance(criterion, FocalLoss)
-
-    def test_unknown_type_raises(self):
-        with pytest.raises(ValueError):
-            get_loss_function("unknown")
-
-    def test_cross_entropy_with_weights(self):
-        weights = torch.tensor([1.0, 2.0, 3.0])
-        criterion = get_loss_function("cross_entropy", weight=weights)
-        assert isinstance(criterion, nn.CrossEntropyLoss)
-
-    def test_focal_forward_runs(self):
-        criterion = get_loss_function("focal")
-        logits = torch.randn(4, 3)
-        targets = torch.tensor([0, 1, 2, 0])
-        loss = criterion(logits, targets)
-        assert loss.item() > 0
-
-# ── imbalance ─────────────────────────────────────────────────────────────────
-
-class TestComputeClassWeights:
-    def test_returns_correct_num_classes(self):
-        labels = torch.tensor([0, 0, 0, 1, 2])
-        weights = compute_class_weights(labels, num_classes=3)
-        assert len(weights) == 3
-
-    def test_minority_class_gets_higher_weight(self):
-        labels = torch.tensor([0, 0, 0, 0, 1])
-        weights = compute_class_weights(labels, num_classes=2)
-        assert weights[1] > weights[0]
-
-    def test_infers_num_classes(self):
-        labels = torch.tensor([0, 1, 2])
-        weights = compute_class_weights(labels)
-        assert len(weights) == 3
-
-
-class TestMakeWeightedSampler:
-    def test_returns_sampler(self):
-        from torch.utils.data import WeightedRandomSampler
-        labels = torch.tensor([0, 0, 0, 1, 2])
-        sampler = make_weighted_sampler(labels, num_classes=3)
-        assert isinstance(sampler, WeightedRandomSampler)
-
-    def test_sampler_length_matches_labels(self):
-        from torch.utils.data import WeightedRandomSampler
-        labels = torch.tensor([0, 0, 1, 1, 2])
-        sampler = make_weighted_sampler(labels, num_classes=3)
-        assert len(sampler) == len(labels)

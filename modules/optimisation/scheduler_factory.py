@@ -15,11 +15,18 @@ def normalise_scheduler_config(
 ) -> dict:
     """Normalise scheduler inputs into a serialisable config dictionary.
 
-    Backward-compatible behaviour:
-    - scheduler=False disables scheduling.
-    - scheduler=None uses the historical default StepLR.
-    - scheduler=dict uses explicit scheduler configuration.
-    - scheduler object is treated as a custom scheduler object.
+    Arguments:
+        scheduler: Scheduler configuration or object. Backward-compatible behaviour:
+            - scheduler=False disables scheduling.
+            - scheduler=None uses the historical default StepLR.
+            - scheduler=dict uses explicit scheduler configuration.
+            - scheduler object is treated as a custom scheduler object.
+        scheduler_step_per_batch: Whether to step the scheduler every batch instead of every epoch.
+        best_metric: The metric to monitor for ReduceLROnPlateau schedulers.
+        best_metric_mode: Whether to minimize or maximize the monitored metric for ReduceLROnPlateAU schedulers. If None, this is inferred from the metric name.
+
+    Returns:
+        dict: Normalised scheduler configuration dictionary.
     """
     if best_metric_mode is None:
         best_metric_mode = "min" if "loss" in best_metric.lower() else "max"
@@ -56,7 +63,24 @@ def normalise_scheduler_config(
 
 
 def create_scheduler(optimiser, scheduler_config: dict | None, scheduler_object=None):
-    """Create a PyTorch scheduler from a scheduler config dictionary."""
+    """Create a PyTorch scheduler from a scheduler config dictionary.
+    
+    Supported schedulers:
+        - StepLR
+        - ExponentialLR
+        - CosineAnnealingLR
+        - ReduceLROnPlateau
+        - SequentialLR with Linear warmup followed by CosineAnnealingLR
+    
+    Arguments:
+        optimiser: The PyTorch optimiser to attach the scheduler to.
+        scheduler_config: A dictionary containing the scheduler configuration. See
+            :func:`~modules.optimisation.scheduler_factory.normalise_scheduler_config` for expected keys.
+        scheduler_object: If passing a custom scheduler object, this should be the instantiated scheduler to return.
+
+    Returns:
+        A PyTorch learning rate scheduler instance, or None if scheduling is disabled.
+    """
     if not scheduler_config:
         return None
 

@@ -9,6 +9,8 @@ from implementations.tf_idf import TFIDFClassifier, TFIDFVectorizer, build_tfidf
 from modules.training_loop import training
 from modules.encoding import LabelEncoder
 from modules import OneTextPreProcessor
+from modules.embedding.safety_bert_static import get_safety_bert_embedding_matrix
+from experiment_setup.artifact_utils import update_artifact_pickle
 
 _COLUMN_MAP_PATH = Path(__file__).parent.parent / "column_map.json"
 
@@ -205,6 +207,8 @@ def tf_idf_train(
     feature_representation = cfg.pop("feature_representation", "tfidf")
     embedding_model_name = cfg.pop("embedding_model_name", "adanish91/safetybert")
 
+    embedding_matrix_to_save = None
+
     if feature_representation == "tfidf":
         train_vecs = vectorizer.transform(train_tokenized_docs)
         val_vecs   = vectorizer.transform(val_tokenized_docs)
@@ -218,6 +222,9 @@ def tf_idf_train(
         from modules.embedding.safety_bert_static import get_safety_bert_embedding_matrix
 
         E = get_safety_bert_embedding_matrix(vectorizer.vocab, model_name=embedding_model_name, verbose=False)
+
+        embedding_matrix_to_save = E.detach().cpu()  # Save the embedding matrix for later analysis and potential reuse
+
         train_vecs = vectorizer.transform_weighted_average_embeddings(train_tokenized_docs, embedding_matrix=E)
         val_vecs   = vectorizer.transform_weighted_average_embeddings(val_tokenized_docs,   embedding_matrix=E)
         test_vecs  = vectorizer.transform_weighted_average_embeddings(test_tokenized_docs,  embedding_matrix=E)
@@ -288,6 +295,10 @@ def tf_idf_train(
             "lemma_config": artifact_extras.get("lemma_config"),
             "keep_numbers": artifact_extras.get("keep_numbers", False),
         }
+
+        if embedding_matrix_to_save is not None:
+            artifacts["embedding_matrix"] = embedding_matrix_to_save
+
         artifact_path = save_dir / f"{save_name}_artifacts.pkl"
         with open(artifact_path, "wb") as af:
             pickle.dump(artifacts, af)
@@ -505,3 +516,176 @@ def tf_idf_hparam_search(
     study = optuna.create_study(direction="maximize", study_name="tf_idf_hparam_search")
     study.optimize(objective, n_trials=n_trials, timeout=timeout, show_progress_bar=True)
     return study
+
+
+
+"""
+TF-IDF continue mode:
+    Keeps old vectorizer.
+    Keeps old label encoder.
+    Can load previous classifier weights.
+    Does not learn new vocabulary.
+
+TF-IDF refresh mode:
+    Calls existing api.train.train(... architecture="tf_idf").
+    Rebuilds vectorizer.
+    Rebuilds embedding matrix if using tfidf_embed_avg.
+    Rebuilds label encoder.
+    Saves fresh artifacts.
+"""
+
+
+def tf_idf_continue_train(
+    bundle,
+    train_df,
+    valid_df,
+    test_df,
+    text_col,
+    train_config=None,
+):
+    """Continue training a saved TF-IDF classifier using its existing artifacts.
+
+    This keeps the saved vectorizer fixed. New words not present in the old
+    vocabulary are ignored. Use api.retrain.retrain(..., mode="refresh") when
+    you want the vectorizer and embedding artifacts rebuilt from the new data.
+    """
+    cfg = {**_TFIDF_TRAIN_DEFAULTS, **(train_config or {})}
+
+    artifacts = bundle["artifacts"]
+    vectorizer = artifacts["vectorizer"]
+    label_enc = bundle["label_enc"]
+
+    energy_model = bool(artifacts.get("energy_model", bundle.get("energy_model", False)))
+    label_col = "energy_type" if energy_model else "potential_damage"
+
+    keep_numbers = artifacts.get("keep_numbers", False)
+    lemma_config = artifacts.get("lemma_config", {})
+    batch_size = int(cfg.pop("batch_size", artifacts.get("batch_size", 32)))
+
+    df_train, df_valid, df_test = pre_process_dataset(
+        train_df,
+        valid_df,
+        test_df,
+        text_col,
+        keep_numbers,
+        lemma_config,
+    )
+
+    tokens_col = f"{text_col}_tokens_lemma" if lemma_config else f"{text_col}_tokens"
+
+    train_docs = df_train[tokens_col].tolist()
+    valid_docs = df_valid[tokens_col].tolist()
+    test_docs = df_test[tokens_col].tolist()
+
+    train_labels = torch.tensor(
+        label_enc.encode_many(df_train[label_col].astype(str).tolist()),
+        dtype=torch.long,
+    )
+    valid_labels = torch.tensor(
+        label_enc.encode_many(df_valid[label_col].astype(str).tolist()),
+        dtype=torch.long,
+    )
+    test_labels = torch.tensor(
+        label_enc.encode_many(df_test[label_col].astype(str).tolist()),
+        dtype=torch.long,
+    )
+
+    feature_representation = artifacts.get("feature_representation", "tfidf")
+
+    if feature_representation == "tfidf":
+        train_vecs = vectorizer.transform(train_docs)
+        valid_vecs = vectorizer.transform(valid_docs)
+        test_vecs = vectorizer.transform(test_docs)
+
+    elif feature_representation == "tfidf_embed_avg":
+        embedding_matrix = artifacts.get("embedding_matrix")
+
+        if embedding_matrix is None:
+            embedding_matrix = get_safety_bert_embedding_matrix(
+                vectorizer.vocab,
+                model_name=artifacts.get("embedding_model_name", "adanish91/safetybert"),
+                verbose=False,
+            )
+
+        train_vecs = vectorizer.transform_weighted_average_embeddings(
+            train_docs,
+            embedding_matrix=embedding_matrix,
+        )
+        valid_vecs = vectorizer.transform_weighted_average_embeddings(
+            valid_docs,
+            embedding_matrix=embedding_matrix,
+        )
+        test_vecs = vectorizer.transform_weighted_average_embeddings(
+            test_docs,
+            embedding_matrix=embedding_matrix,
+        )
+
+    else:
+        raise ValueError(
+            f"Unsupported TF-IDF feature_representation={feature_representation!r}"
+        )
+
+    train_dl = build_tfidf_dataloader(train_vecs, train_labels, batch_size=batch_size)
+    valid_dl = build_tfidf_dataloader(valid_vecs, valid_labels, batch_size=batch_size, shuffle=False)
+    test_dl = build_tfidf_dataloader(test_vecs, test_labels, batch_size=batch_size, shuffle=False)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = bundle["model"].to(device)
+
+    optimizer_fn = cfg.pop("optimizer_fn", None)
+    if optimizer_fn is not None:
+        optimiser = optimizer_fn(model)
+    else:
+        lr = cfg.pop("learning_rate", 1e-4)
+        optimiser = torch.optim.Adam(model.parameters(), lr=lr)
+
+    old_config = bundle.get("config", {})
+    run_name = cfg.pop(
+        "run_name",
+        f"{old_config.get('run_name', old_config.get('save_name', 'tf_idf'))}_continue",
+    )
+
+    result = training(
+        model_type="tf_idf",
+        model=model,
+        train_dl=train_dl,
+        valid_dl=valid_dl,
+        test_dl=test_dl,
+        device=device,
+        energy_model=energy_model,
+        num_classes=label_enc.num_classes,
+        class_dict=label_enc.id_to_label,
+        optimiser=optimiser,
+        run_name=run_name,
+        save=True,
+        **cfg,
+    )
+
+    if result.get("best_model_state_dict") is not None and result["config"].get("save"):
+        save_dir = Path(result["config"]["save_dir"])
+        save_name = result["config"]["save_name"]
+
+        updated_artifacts = dict(artifacts)
+        updated_artifacts.update(
+            {
+                "vectorizer": vectorizer,
+                "label_enc": label_enc,
+                "energy_model": energy_model,
+                "feature_representation": feature_representation,
+                "batch_size": batch_size,
+                "text_col": text_col,
+                "lemma_config": lemma_config,
+                "keep_numbers": keep_numbers,
+                "input_dim": int(train_vecs.shape[1]),
+                "base_model_dir": old_config.get("save_dir"),
+                "retrain_mode": "continue",
+            }
+        )
+
+        if feature_representation == "tfidf_embed_avg":
+            updated_artifacts["embedding_matrix"] = embedding_matrix.detach().cpu()
+
+        with open(save_dir / f"{save_name}_artifacts.pkl", "wb") as af:
+            pickle.dump(updated_artifacts, af)
+
+    return result

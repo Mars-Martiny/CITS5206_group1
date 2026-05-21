@@ -7,10 +7,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from .utility import _safe_class_name
-from modules.optimisation.loss import get_loss_function
-from .imbalance import make_weighted_sampler
-from modules.optimisation import normalise_scheduler_config, create_scheduler
+from .utility import _safe_class_name, _normalise_class_dict
+from modules.optimisation import normalise_scheduler_config, create_scheduler, get_loss_function, make_weighted_sampler, normalise_optimiser_config, create_optimiser
 
 
 # CONFIG AND UTILITY FUNCTIONS FOR TRAINING LOOP
@@ -64,10 +62,19 @@ def _build_train_config(
     # Generate a timestamp for unique run identification and directory naming
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # DEFAULT OPTIMISER, SCHEDULER, CRITERION // Set default optimiser, scheduler, and criterion if not provided
-    if optimiser is None:
-        lr = optimiser_args.get("lr", 1e-3) if optimiser_args else 1e-3
-        optimiser = optim.Adam(model.parameters(), lr=lr)
+    # Optimiser
+    optimiser_config = normalise_optimiser_config(
+        optimiser=optimiser,
+        optimiser_args=optimiser_args,
+    )
+    
+    optimiser_object = optimiser
+    
+    optimiser = create_optimiser(
+        parameters=model.parameters(),
+        optimiser_config=optimiser_config,
+        optimiser_object=optimiser_object,
+    )
 
 
     if use_weighted_sampler and train_labels is not None:
@@ -77,12 +84,6 @@ def _build_train_config(
             batch_size=train_dl.batch_size,
             sampler=sampler,
         )
-
-    # # False means "no scheduler" (explicit opt-out); None means "use default"
-    # if scheduler is False:
-    #     scheduler = None
-    # elif scheduler is None:
-    #     scheduler = optim.lr_scheduler.StepLR(optimiser, step_size=1, gamma=0.95)
     
     scheduler_config = normalise_scheduler_config(
         scheduler=scheduler,
@@ -134,6 +135,9 @@ def _build_train_config(
     else:
         save_name = model_type.lower().replace(" ", "_")
         run_name = f"{save_name}_run_{timestamp}"
+
+    # Normalise class_dict to ensure keys are integers and values are strings
+    class_dict = _normalise_class_dict(class_dict)
 
     # BUILD CONFIG DICTIONARY // Build the configuration dictionary with all training parameters and metadata
     config = {

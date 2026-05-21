@@ -3,21 +3,26 @@
 
 Includes:
     RunSaver class: Encapsulates history management, metrics appending, artifact saving, and plotting.
-        _initialise_history: Initializes the history dictionary to store training and validation metrics.
-        append_metrics: Appends the metrics for the current epoch to the history dictionary.
-        save_artifacts: Saves the best model state dict and run summary to disk.
+        _initialise_history:    Initializes the history dictionary to store training and validation metrics.
+        create_directory:       Creates a directory for saving run artifacts based on the current timestamp. 
+        append_metrics:         Appends the metrics for the current epoch to the history dictionary.
+        save_artifacts:         Saves the best model state dict and run summary to disk.
+        plot_confusion_matrix:  Plots a confusion matrix as a heatmap.
+        plot_base_metrics:      Plots a single metric for training and validation over epochs.
+        plot_history:           Generates and saves plots for each metric in the history, including combined plots and class-specific metrics.
 
 """
 
 import json
 import math
 import torch
-from pathlib import Path
-import matplotlib.pyplot as plt
-import seaborn as sns
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 
-from .utility import _serialise_value
+from pathlib import Path
+
+from .utility import _serialise_value, _ordered_class_names, _infer_num_classes_from_history, _get_class_metric_value
 
 
 class RunSaver:
@@ -86,6 +91,7 @@ class RunSaver:
             },
         }
 
+
     # CREATE DIRECTORY // Create a directory for saving run artifacts based on the current timestamp
     def create_directory(self, config):
         """Create a directory for saving run artifacts."""
@@ -94,6 +100,7 @@ class RunSaver:
         save_dir.mkdir(parents=True, exist_ok=True)
         config["save_dir"] = save_dir  # Add save_dir to config for later use
         return save_dir
+
 
     # APPEND METRICS TO HISTORY // Append the metrics for the current epoch to the history dictionary
     def append_metrics(self, section, metrics, training=True):
@@ -108,6 +115,7 @@ class RunSaver:
         for key in history_section.keys():
             if key in metrics:
                 history_section[key].append(metrics[key])
+
 
     # SAVE RUN ARTIFACTS // Save the best model state dict and run summary to disk
     def save_artifacts(self, config, run_summary):
@@ -157,6 +165,7 @@ class RunSaver:
 
         return str(model_path), str(summary_path)
 
+
     # PLOT CONFUSION MATRIX // Plot a confusion matrix as a heatmap
     def plot_confusion_matrix(self, cm, save_path, class_dict=None):
         """Plot and save a confusion matrix as a heatmap.
@@ -169,11 +178,8 @@ class RunSaver:
         cm = np.array(cm)
         num_classes = cm.shape[0]
         
-        # Create class labels
-        if class_dict:
-            labels = [class_dict.get(i, f"class_{i}") for i in range(num_classes)]
-        else:
-            labels = [f"class_{i}" for i in range(num_classes)]
+        # Get class labels
+        labels = _ordered_class_names(class_dict, num_classes)
         
         plt.figure(figsize=(10, 8))
         sns.heatmap(
@@ -188,187 +194,162 @@ class RunSaver:
         plt.xlabel("Predicted Label")
         plt.ylabel("True Label")
         plt.title("Confusion Matrix")
+        plt.xticks(rotation=45, ha="right")
+        plt.yticks(rotation=0)
         plt.tight_layout()
         plt.savefig(save_path, dpi=100)
         plt.close()
 
+
     # PLOT METRICS // Generate and save plots for each metric in the history
-    def plot_base_metrics(self, metric, x_values, best_epoch, save_dir, save_name, y_axis_ranges, x_max, training=True):
-        """Plot a single metric for training and validation over epochs."""
-        plt.figure()
-        if training:
-            plt.plot(x_values, self.history["training"]["train"][metric], label=f"Train {metric}")
-            if metric != "lr":  # Don't plot validation metrics for learning rate
-                plt.plot(x_values, self.history["training"]["val"][metric], label=f"Val {metric}")
-        else:
-            plt.plot(x_values, self.history["test"][metric], label=f"Test {metric}")
+    def plot_combined_metrics(self, title, metrics, x_values, best_epoch, plot_path, range_0_1, x_max, 
+                                class_name=None, class_idx=None, train_class_metrics=None, val_class_metrics=None):
+        """Plot metrics listed in 'metrics' for training and validation over epochs."""
+        # Colours for metrics
+        metric_colors = ["#3498db", "#8e44ad", "#f39c12", "#e74c3c"]  # blue, purple, dark orange, red
+
+        plt.figure(figsize=(12, 6))
+        for i, metric in enumerate(metrics):
+            if class_name is not None:
+                train_values = [
+                        _get_class_metric_value(epoch_metrics, class_idx, class_name, metric)
+                        for epoch_metrics in train_class_metrics
+                    ]
+
+                val_values = [
+                    _get_class_metric_value(epoch_metrics, class_idx, class_name, metric)
+                    for epoch_metrics in val_class_metrics
+                ]
+
+            else:
+                train_values = self.history["training"]["train"][metric]
+                if metric != "lr":  # Don't plot validation metrics for learning rate since it's not a performance metric and may have a different scale
+                    val_values = self.history["training"]["val"][metric]
+
+            plt.plot(
+                x_values,
+                train_values,
+                label=f"Train {metric}",
+                color=metric_colors[i],
+                linewidth=2,
+                alpha=0.7,
+            )
+            if metric != "lr":  # Don't plot validation metrics for learning rate since it's not a performance metric and may have a different scale
+                plt.plot(
+                    x_values,
+                    val_values,
+                    label=f"Val {metric}",
+                    color=metric_colors[i],
+                    linewidth=2,
+                    linestyle="--",
+                    alpha=0.7,
+                )
+
         plt.axvline(
             x=best_epoch,
             color="green",
             linestyle="--",
             linewidth=2,
             label=f"Best epoch ({best_epoch})",
+            alpha=0.55,
         )
         plt.xlabel("Epoch")
-        plt.ylabel(metric.capitalize())
-        plt.title(f"{metric.capitalize()} over Epochs")
-        plt.legend(loc="best")
+        plt.ylabel("Score")
+        plt.title(f"{title} over Epochs")
+        plt.legend(loc="best", fontsize=8)
         plt.grid()
-        if y_axis_ranges.get(metric) is not None:
-            plt.ylim(*y_axis_ranges[metric])
+        if range_0_1:
+            plt.ylim(0.0, 1.1)
         plt.xlim(1, x_max)
-        if training:        
-            plot_path = Path(save_dir) / f"{save_name}_{metric}_plot.png"
-        else:
-            plot_path = Path(save_dir) / f"{save_name}_test_{metric}_plot.png"
-        plt.savefig(plot_path)
+        plt.savefig(plot_path, dpi=100, bbox_inches="tight")
         plt.close()
 
 
     # PLOT HISTORY // Generate and save plots for each metric in the history
-    def plot_history(self, best_epoch, save_dir, save_name, class_dict=None):
+    def plot_history(self, best_epoch, config):
         """Generate and save per-metric and combined plots from training history."""
-        # Define standard y-axis ranges for metrics with consistent bounds
-        y_axis_ranges = {
-            "loss": None,
-            "accuracy": (0.0, 1.0),
-            "precision_macro": (0.0, 1.0),
-            "recall_macro": (0.0, 1.0),
-            "f1_macro": (0.0, 1.0),
-            "precision_weighted": (0.0, 1.0),
-            "recall_weighted": (0.0, 1.0),
-            "f1_weighted": (0.0, 1.0),
-            "lr": None,
-        }
+        # Make a "plots" subdirectory for all plots in save_dir
+        save_dir = Path(config["save_dir"])          # Use the save_dir from config as parent
+        plot_dir = save_dir / "plot_metrics"                
+        plot_dir.mkdir(parents=True, exist_ok=True)
+
+        # Extract config values frequently needed for plotting
+        save_name = config["save_name"]
+        class_dict = config["class_dict"]
 
         # Derive a shared x-axis max rounded up to the next multiple of 5
         num_epochs = len(self.history["training"]["train"]["loss"])
         x_max = ((num_epochs + 4) // 5) * 5 if num_epochs > 0 else 5
-        x_values = list(range(1, num_epochs + 1))
+        x_values = list(int(x) for x in range(1, num_epochs + 1))
 
 
-        # plot each metric for train and val over epochs (test is a single evaluation, not a time series)
-        for metric in ["loss", "accuracy", "f1_macro", "precision_weighted", "f1_weighted"]:
-            self.plot_base_metrics(metric, x_values, best_epoch, save_dir, save_name, y_axis_ranges, x_max, training=True)
+        # COMBINED PLOTS // Plot multiple metrics together for easier comparison:     
+        # - Macro metrics plot: accuracy, precision_macro, recall_macro, f1_macro
+        macro_metrics = ["precision_macro", "recall_macro", "f1_macro", "accuracy"]
+        plot_path = Path(plot_dir) / f"{save_name}_combined_macro_metrics_plot.png"
+        title = "Macro metrics over Epochs"
+        self.plot_combined_metrics(title, macro_metrics, x_values, best_epoch, plot_path, True, x_max)
+
+        # - Weighted metrics plot: accuracy, precision_weighted, recall_weighted, f1_weighted
+        weighted_metrics = ["precision_weighted", "recall_weighted", "f1_weighted", "accuracy"]
+        plot_path = Path(plot_dir) / f"{save_name}_combined_weighted_metrics_plot.png"
+        title = "Weighted metrics over Epochs"
+        self.plot_combined_metrics(title, weighted_metrics, x_values, best_epoch, plot_path, True, x_max)
 
 
-        # plot learning rate if available
+        # PLOT LOSS
+        weighted_metrics = ["loss"]
+        plot_path = Path(plot_dir) / f"{save_name}_loss_metric_plot.png"
+        title = "Loss over Epochs"
+        self.plot_combined_metrics(title, weighted_metrics, x_values, best_epoch, plot_path, False, x_max)
+
+
+        # PLOT LEARNING RATE
         if self.history["training"]["train"]["lr"]:
-            self.plot_base_metrics("lr", x_values, best_epoch, save_dir, save_name, y_axis_ranges, x_max, training=True)
+            lr_metrics = ["lr"]
+            plot_path = Path(plot_dir) / f"{save_name}_learning_rate_plot.png"
+            title = "Learning Rate over Epochs"
+            self.plot_combined_metrics(title, lr_metrics, x_values, best_epoch, plot_path, False, x_max)        
 
 
-        # Plot class-specific metrics if available
+        # PLOT CLASS-SPECIFIC METRICS // if class-specific metrics available
         train_class_metrics = self.history["training"]["train"].get("class_metrics", [])
         val_class_metrics = self.history["training"]["val"].get("class_metrics", [])
-        
+
         if train_class_metrics and isinstance(train_class_metrics[0], dict):
-            # Extract class names from first epoch
-            class_names = list(train_class_metrics[0].keys())
+            # Make class metrics directory // there are quite a few classes and metrics, so we put them in a separate "class_metrics" subdirectory to keep things organised
+            class_dir = plot_dir / "class_metrics"
+            class_dir.mkdir(parents=True, exist_ok=True)
+
+            num_classes = _infer_num_classes_from_history(train_class_metrics, class_dict)
+            class_names = _ordered_class_names(class_dict, num_classes)
             
-            # For each metric (precision, recall, f1), create per-class plots
-            for metric in ["precision", "recall", "f1"]:
-                plt.figure(figsize=(12, 6))
-                
-                for class_name in class_names:
-                    # Extract metric values for this class across epochs
-                    train_values = [
-                        epoch_metrics.get(class_name, {}).get(metric, 0.0)
-                        for epoch_metrics in train_class_metrics
-                    ]
-                    val_values = [
-                        epoch_metrics.get(class_name, {}).get(metric, 0.0)
-                        for epoch_metrics in val_class_metrics
-                    ]
-                    
-                    plt.plot(x_values, train_values, label=f"Train {class_name}", marker="o", alpha=0.7)
-                    plt.plot(x_values, val_values, label=f"Val {class_name}", marker="s", linestyle="--", alpha=0.7)
-                
-                plt.axvline(
-                    x=best_epoch,
-                    color="red",
-                    linestyle="--",
-                    linewidth=2,
-                    label=f"Best epoch ({best_epoch})",
-                )
-                plt.xlabel("Epoch")
-                plt.ylabel(metric.capitalize())
-                plt.title(f"Class-wise {metric.capitalize()} over Epochs")
-                plt.legend(loc="best", fontsize=8)
-                plt.grid()
-                plt.ylim(0.0, 1.0)
-                plt.xlim(1, x_max)
-                plot_path = Path(save_dir) / f"{save_name}_class_{metric}_plot.png"
-                plt.savefig(plot_path, dpi=100, bbox_inches="tight")
-                plt.close()
+            # For each metric (precision, recall, f1), create per-class plots.
+            # Legends always use class_dict names. Values are read from current
+            # class-name keys, with fallback support for older "class_N" histories.
+            for class_idx, class_name in enumerate(class_names):
+                metrics = ["precision", "recall", "f1"]
+                save_class_name = class_name.lower().replace(" ", "_").replace("/", "_")
+                plot_path = Path(class_dir) / f"{save_name}_{save_class_name}_metrics_plot.png"
+                title = f"{class_name} Class metrics over Epochs"
+
+                self.plot_combined_metrics(title, metrics, x_values, best_epoch, plot_path, True, x_max, 
+                                        class_name, class_idx, train_class_metrics, val_class_metrics)
 
 
-        # Get confusion matrix metric for best epoch validation and test
+        # PLOT CONFUSION MATRICES // Get confusion matrix metric for best epoch validation and test
         val_confusion_matrices = self.history["training"]["val"].get("confusion_matrix", [])
         test_confusion_matrices = self.history["test"].get("confusion_matrix", [])
 
         # Plot best epoch validation confusion matrix
         if val_confusion_matrices and len(val_confusion_matrices) >= best_epoch - 1:
             best_val_cm = val_confusion_matrices[best_epoch - 1]
-            val_cm_path = Path(save_dir) / f"{save_name}_val_confusion_matrix_epoch{best_epoch}.png"
+            val_cm_path = Path(plot_dir) / f"{save_name}_confusion_matrix_val_best_epoch.png"
             self.plot_confusion_matrix(best_val_cm, val_cm_path, class_dict=class_dict)
+
         # Plot test confusion matrix
         if test_confusion_matrices:
             test_cm = test_confusion_matrices[-1] if isinstance(test_confusion_matrices, list) else test_confusion_matrices
-            test_cm_path = Path(save_dir) / f"{save_name}_test_confusion_matrix.png"
+            test_cm_path = Path(plot_dir) / f"{save_name}_confusion_matrix_test.png"
             self.plot_confusion_matrix(test_cm, test_cm_path, class_dict=class_dict)
 
-
-        # Combined plot: accuracy, precision_macro, recall_macro, f1_macro
-        plt.figure(figsize=(12, 8))
-
-        # Warm colors for training metrics
-        train_colors = {
-            "accuracy": "#e74c3c",  # red
-            "precision_macro": "#e67e22",  # orange
-            "recall_macro": "#f39c12",  # dark orange
-            "f1_macro": "#d35400",  # dark orange-red
-        }
-        # Cool colors for validation metrics
-        val_colors = {
-            "accuracy": "#3498db",  # blue
-            "precision_macro": "#2980b9",  # dark blue
-            "recall_macro": "#8e44ad",  # purple
-            "f1_macro": "#6c3483",  # dark purple
-        }
-
-        combined_metrics = ["accuracy", "precision_macro", "recall_macro", "f1_macro"]
-
-        for metric in combined_metrics:
-            plt.plot(
-                x_values,
-                self.history["training"]["train"][metric],
-                label=f"Train {metric}",
-                color=train_colors[metric],
-                linewidth=2,
-            )
-            plt.plot(
-                x_values,
-                self.history["training"]["val"][metric],
-                label=f"Val {metric}",
-                color=val_colors[metric],
-                linewidth=2,
-                linestyle="--",
-            )
-
-        plt.axvline(
-            x=best_epoch,
-            color="red",
-            linestyle="--",
-            linewidth=2,
-            label=f"Best epoch ({best_epoch})",
-        )
-        plt.xlabel("Epoch")
-        plt.ylabel("Score")
-        plt.title("Combined Metrics over Epochs")
-        plt.legend(loc="best", fontsize=9)
-        plt.grid()
-        plt.ylim(0.0, 1.0)
-        plt.xlim(1, x_max)
-        plot_path = Path(save_dir) / f"{save_name}_combined_metrics_plot.png"
-        plt.savefig(plot_path)
-        plt.close()

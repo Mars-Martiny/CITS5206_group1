@@ -144,11 +144,11 @@ if st.button("Train Model", type="primary"):
     if d_model and _optional_int(d_model):
         cfg["d_model"] = int(d_model)
 
-    import api
+    from api import train
 
     with st.spinner("Training in progress…"):
         try:
-            result = api.train(
+            result = train(
                 train_path=train_path,
                 valid_path=valid_path,
                 test_path=test_path,

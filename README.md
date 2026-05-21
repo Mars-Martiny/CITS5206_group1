@@ -35,7 +35,7 @@ The sample dataset is only for demonstration. It is not intended to represent th
 Please use the facilitator release branch:
 
 ```bash
-git checkout feat/facilitator_use
+git checkout release/facilitator_use
 ```
 
 This branch contains:
@@ -330,10 +330,6 @@ python cli.py metrics --model-dir trained_models/<saved_model_directory>
 ## 11. Recommended Facilitator Demonstration Flow
 
 For marking, the following sequence can be used to quickly verify that the project runs:
-
-```bash
-git checkout feat/facilitator_use
-```
 
 Install dependencies:
 

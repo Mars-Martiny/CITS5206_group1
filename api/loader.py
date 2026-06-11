@@ -102,7 +102,7 @@ def _build_model(
         )
         num_classes = int(state_dict[last_linear_key].shape[0])
         vec = artifacts.get("vectorizer")
-        inferred_vocab = len(vec.vocab) if vec is not None else vocab_infer
+        inferred_inoput_dim = int(artifacts.get("input_dim", vocab_infer))
         inferred_hidden = int(artifacts.get("hidden_dim", hidden_infer))
 
         label_enc_art = artifacts.get("label_enc")
@@ -110,9 +110,9 @@ def _build_model(
             num_classes = int(label_enc_art.num_classes)
 
         return TFIDFClassifier(
-            vocab_size=inferred_vocab,
-            num_classes=num_classes,
-            hidden_dim=inferred_hidden,
+            vocab_size = inferred_inoput_dim,
+            num_classes = num_classes,
+            hidden_dim = inferred_hidden,
         )
 
     if mt_lower.startswith("bigru"):
@@ -170,8 +170,11 @@ def _build_model(
         dropout = float(artifacts.get("dropout", 0.2))
         num_classes = int(artifacts["label_enc"].num_classes)
 
+        tokenizer_name = artifacts.get("tokenizer_name")
+
         bert_cfg = BertEmbeddingConfig(
             model_name=model_name,
+            tokenizer_name=tokenizer_name,
             max_length=max_length,
             dropout=0.1,
             pooling=pooling,

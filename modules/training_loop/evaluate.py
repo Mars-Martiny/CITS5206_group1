@@ -6,11 +6,11 @@ import torch.nn.functional as F
 from pathlib import Path
 
 from .metrics import _compute_classification_metrics
-from .utility import _unpack_batch
+from .utility import _unpack_batch, _normalise_class_dict, _class_name_for_index
 from .run_saving import RunSaver
 from modules.inference import run_inference
 
-FATAL_CLASSES = ["Single Fatality", "Multiple Fatality"]
+FATAL_CLASSES = ["Fatal", "Single Fatality", "Multiple Fatality"]
 
 _DEFAULT_REQUIREMENTS_PATH = Path(__file__).parents[2] / "config_requirement_check.json"
 
@@ -25,6 +25,15 @@ def _load_default_requirements():
 def _normalise_threshold(value):
     """Convert percentage (>1) to fraction; leave fractions unchanged."""
     return value / 100 if value > 1 else value
+
+
+def _fatal_class_indices(config):
+    """Return integer class indices whose names match FATAL_CLASSES."""
+    class_dict = _normalise_class_dict(config.get("class_dict", {}))
+    return [
+        idx for idx, name in class_dict.items()
+        if isinstance(idx, int) and name in FATAL_CLASSES
+    ]
 
 
 def _check_requirements(all_targets, all_probs, all_preds, metrics, config):
@@ -53,7 +62,7 @@ def _check_requirements(all_targets, all_probs, all_preds, metrics, config):
 
     result = {}
     n = max(len(all_probs), 1)
-    max_probs = all_probs.max(dim=1).values if len(all_probs) > 0 else torch.tensor([])
+    max_probs = all_probs.max(dim=1).values if all_probs.numel() > 0 else torch.tensor([])
 
     # Confidence tier distribution
     conf_thresholds = requirements.get("confidence_threshold", {})
@@ -72,12 +81,13 @@ def _check_requirements(all_targets, all_probs, all_preds, metrics, config):
 
     # Recall on true fatal samples >= target
     if not config.get("energy_model", False):
-        fatal_indices = [
-            idx for idx, name in config.get("class_dict", {}).items()
-            if name in FATAL_CLASSES
-        ]
+        fatal_indices = _fatal_class_indices(config)
         if fatal_indices:
-            fatal_tensor = torch.tensor(fatal_indices)
+            fatal_tensor = torch.tensor(
+                fatal_indices,
+                dtype=all_targets.dtype,
+                device=all_targets.device,
+            )
             true_fatal_mask = torch.isin(all_targets, fatal_tensor)
             fatal_total = true_fatal_mask.sum().item()
             if fatal_total > 0:
@@ -104,8 +114,15 @@ def _check_requirements(all_targets, all_probs, all_preds, metrics, config):
     per_class_req = {}
     for idx_key, target_f1 in f1_targets.items():
         idx = int(idx_key)
-        class_name = class_dict.get(idx, f"class_{idx}")
-        actual_f1 = class_metrics.get(class_name, {}).get("f1", 0.0)
+        class_name = _class_name_for_index(class_dict, idx)
+
+        # Normal metric output is keyed by class name. Fallback to class_N for
+        # older histories produced before class_dict name resolution was fixed.
+        actual_f1 = (
+            class_metrics.get(class_name, {})
+            .get("f1", class_metrics.get(f"class_{idx}", {}).get("f1", 0.0))
+        )
+
         has_target = target_f1 > 0.0
         per_class_req[class_name] = {
             "f1": actual_f1,
@@ -154,13 +171,13 @@ def evaluate(config):
             - threshold_used: the threshold value used
             - fatal_flag_count: number of predictions flagged as fatal
             - fatal_flag_rate: proportion of all predictions that are fatal
-            If requirements configured, also:
-            - confidence_high_rate, confidence_medium_rate, confidence_low_rate
-            - req_high_confidence_met
-            - fatal_accuracy: recall on true fatal samples
-            - req_fatal_accuracy_met
-            - per_class_requirements: per-class F1 check results
-            - req_all_f1_targets_met
+            -> If requirements configured, also:
+                - confidence_high_rate, confidence_medium_rate, confidence_low_rate
+                - req_high_confidence_met
+                - fatal_accuracy: recall on true fatal samples
+                - req_fatal_accuracy_met
+                - per_class_requirements: per-class F1 check results
+                - req_all_f1_targets_met
     """
     if config["test_dl"] is None:
         return {}
@@ -194,9 +211,9 @@ def evaluate(config):
             all_probs.append(probs.detach().cpu())
 
     avg_loss = total_loss / max(total_examples, 1)
-    all_preds = torch.cat(all_preds) if all_preds else torch.tensor([])
-    all_targets = torch.cat(all_targets) if all_targets else torch.tensor([])
-    all_probs = torch.cat(all_probs) if all_probs else torch.tensor([])
+    all_preds = torch.cat(all_preds) if all_preds else torch.tensor([], dtype=torch.long)
+    all_targets = torch.cat(all_targets) if all_targets else torch.tensor([], dtype=torch.long)
+    all_probs = torch.cat(all_probs) if all_probs else torch.empty((0, config["num_classes"]))
 
     # Compute base classification metrics from metrics.py
     metrics = _compute_classification_metrics(
@@ -205,9 +222,9 @@ def evaluate(config):
         config=config,
     )
     metrics["loss"] = avg_loss
-    
+
     # Threshold analysis - auto classification rate
-    max_probs = all_probs.max(dim=1).values
+    max_probs = all_probs.max(dim=1).values if all_probs.numel() > 0 else torch.tensor([])
     high_confidence = (max_probs > config["threshold"]).sum().item()
     metrics["auto_classification_rate"] = high_confidence / max(total_examples, 1)
     metrics["meets_requirement"] = metrics["auto_classification_rate"] >= 0.70
@@ -215,12 +232,14 @@ def evaluate(config):
 
     # Fatal category flagging - proportion of all predictions that are fatal
     if not config["energy_model"]:
-        fatal_indices = [
-            idx for idx, name in config.get("class_dict", {}).items()
-            if name in FATAL_CLASSES
-        ]
+        fatal_indices = _fatal_class_indices(config)
         if fatal_indices:
-            fatal_mask = torch.isin(all_preds, torch.tensor(fatal_indices))
+            fatal_tensor = torch.tensor(
+                fatal_indices,
+                dtype=all_preds.dtype,
+                device=all_preds.device,
+            )
+            fatal_mask = torch.isin(all_preds, fatal_tensor)
             metrics["fatal_flag_count"] = fatal_mask.sum().item()
             metrics["fatal_flag_rate"] = fatal_mask.sum().item() / max(total_examples, 1)
 

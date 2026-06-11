@@ -1,0 +1,10 @@
+Train:
+python cli.py train \
+  --train dataset/model1_train.csv \
+  --valid dataset/model1_valid.csv \
+  --test  dataset/model1_test.csv \
+  --model-type  energy \
+  --architecture tf_idf
+
+Infer:
+python cli.py infer   --dataset dataset/sample_final_dataset.csv   --output  results.csv   --energy-model trained_models/20260518_124014_tf_idf

@@ -87,17 +87,24 @@ def _tfidf_feature_matrix(proc_df: pd.DataFrame, text_col: str, art: dict) -> to
     vectorizer = art["vectorizer"]
 
     if repr_name == "tfidf":
-        return vectorizer.transform(docs)
+        return vectorizer.transform(docs) 
     if repr_name == "tfidf_embed_avg":
-        from modules.embedding.safety_bert_static import get_safety_bert_embedding_matrix
+        emb_mat = art.get("embedding_matrix")
 
-        emb_model = art.get("embedding_model_name", "adanish91/safetybert")
-        emb_mat = get_safety_bert_embedding_matrix(
-            vectorizer.vocab,
-            model_name=emb_model,
-            verbose=False,
+        if emb_mat is None:
+            from modules.embedding.safety_bert_static import get_safety_bert_embedding_matrix
+
+            emb_model = art.get("embedding_model_name", "adanish91/safetybert")
+            emb_mat = get_safety_bert_embedding_matrix(
+                vectorizer.vocab,
+                model_name=emb_model,
+                verbose=False,
+            )
+
+        weighted = vectorizer.transform_weighted_average_embeddings(
+            docs,
+            embedding_matrix=emb_mat,
         )
-        weighted = vectorizer.transform_weighted_average_embeddings(docs, embedding_matrix=emb_mat)
         return weighted.detach().cpu() if weighted.is_cuda else weighted
 
     raise ValueError(f"Unsupported TF-IDF feature_representation={repr_name!r}")

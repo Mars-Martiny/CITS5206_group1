@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import platform
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -93,6 +95,10 @@ def _confirmed_rows() -> set[int]:
     return st.session_state.setdefault("confirmed_rows", set())
 
 
+def _saved_decisions() -> dict:
+    return st.session_state.setdefault("saved_decisions", {})
+
+
 def _restore_state_from_df(df: pd.DataFrame) -> None:
     """Populate session state from a previously saved CSV."""
     confirmed: set[int] = set()
@@ -102,6 +108,7 @@ def _restore_state_from_df(df: pd.DataFrame) -> None:
     if _DAMAGE_DECISION_COL in df.columns:
         col_prefix_pairs.append((_DAMAGE_DECISION_COL, "damage"))
 
+    saved = _saved_decisions()
     for col, prefix in col_prefix_pairs:
         for row_idx, row in df.iterrows():
             raw = row.get(col, "")
@@ -112,20 +119,23 @@ def _restore_state_from_df(df: pd.DataFrame) -> None:
                 continue
             confirmed.add(row_idx)
             if val.startswith("Overridden: "):
-                st.session_state[f"{prefix}_decision_{row_idx}"] = "Override"
-                st.session_state[f"{prefix}_override_{row_idx}"] = val[len("Overridden: "):]
+                saved[f"{prefix}_decision_{row_idx}"] = "Override"
+                saved[f"{prefix}_override_{row_idx}"] = val[len("Overridden: "):]
             else:
-                st.session_state[f"{prefix}_decision_{row_idx}"] = "Accept"
+                saved[f"{prefix}_decision_{row_idx}"] = "Accept"
     st.session_state["confirmed_rows"] = confirmed
 
 
 def _decision_for(row_idx: int, prefix: str) -> str:
-    """Return the saved decision string for a confirmed row and prediction type."""
-    decision = st.session_state.get(f"{prefix}_decision_{row_idx}")
+    """Return the saved decision string for a row and prediction type."""
+    saved = _saved_decisions()
+    # saved_decisions is populated on confirm; fall back to live widget state for
+    # rows that have been filled in but not yet confirmed.
+    decision = saved.get(f"{prefix}_decision_{row_idx}") or st.session_state.get(f"{prefix}_decision_{row_idx}")
     if not decision:
         return ""
     if decision == "Override":
-        label = st.session_state.get(f"{prefix}_override_{row_idx}", "")
+        label = saved.get(f"{prefix}_override_{row_idx}") or st.session_state.get(f"{prefix}_override_{row_idx}", "")
         return f"Overridden: {label}"
     return "Accepted"
 
@@ -133,17 +143,10 @@ def _decision_for(row_idx: int, prefix: str) -> str:
 def _build_export_df(review_df: pd.DataFrame) -> pd.DataFrame:
     """Attach a decision column for each prediction type present in the data."""
     result = review_df.copy()
-    confirmed = _confirmed_rows()
-    has_energy = "predicted_energy_type" in review_df.columns
-    has_damage = "predicted_damage_potential" in review_df.columns
-    if has_energy:
-        result[_ENERGY_DECISION_COL] = [
-            _decision_for(idx, "energy") if idx in confirmed else "" for idx in result.index
-        ]
-    if has_damage:
-        result[_DAMAGE_DECISION_COL] = [
-            _decision_for(idx, "damage") if idx in confirmed else "" for idx in result.index
-        ]
+    if "predicted_energy_type" in review_df.columns:
+        result[_ENERGY_DECISION_COL] = [_decision_for(idx, "energy") for idx in result.index]
+    if "predicted_damage_potential" in review_df.columns:
+        result[_DAMAGE_DECISION_COL] = [_decision_for(idx, "damage") for idx in result.index]
     return result
 
 
@@ -250,6 +253,15 @@ def _review_section(
                 _decision_widget("damage", "Damage", damage_labels)
 
     if st.button("Confirm & Next →", key=f"confirm_{section_key}", type="primary"):
+        saved = _saved_decisions()
+        for idx in batch_rows.index:
+            for prefix in ("energy", "damage"):
+                dec_key = f"{prefix}_decision_{idx}"
+                ov_key = f"{prefix}_override_{idx}"
+                if dec_key in st.session_state:
+                    saved[dec_key] = st.session_state[dec_key]
+                if ov_key in st.session_state:
+                    saved[ov_key] = st.session_state[ov_key]
         confirmed.update(batch_rows.index.tolist())
         st.session_state["confirmed_rows"] = confirmed
         st.rerun()
@@ -298,6 +310,7 @@ if input_mode == "Upload CSV":
         st.session_state["_upload_file_id"] = uploaded.file_id
         df_loaded = pd.read_csv(save_uploaded_file(uploaded))
         st.session_state["review_df"] = df_loaded
+        st.session_state["saved_decisions"] = {}
         for key in ("batch_fatal", "batch_high", "batch_medium", "batch_low"):
             st.session_state.pop(key, None)
         resume_cols = [c for c in (_ENERGY_DECISION_COL, _DAMAGE_DECISION_COL) if c in df_loaded.columns]
@@ -349,6 +362,7 @@ else:
                 st.stop()
         st.session_state["review_df"] = result_df
         st.session_state["confirmed_rows"] = set()
+        st.session_state["saved_decisions"] = {}
         st.session_state["_upload_file_id"] = None
         for key in ("batch_fatal", "batch_high", "batch_medium", "batch_low"):
             st.session_state.pop(key, None)
@@ -399,11 +413,12 @@ with summary_cols[5]:
 
 save_col, _ = st.columns([1, 3])
 with save_col:
+    _save_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     progress_csv = _build_export_df(review_df).to_csv(index=False)
     st.download_button(
         "💾 Save Progress",
         data=progress_csv,
-        file_name="review_in_progress.csv",
+        file_name=f"review_in_progress_{_save_ts}.csv",
         mime="text/csv",
         help="Download current state. Re-upload this file tomorrow to resume where you left off.",
     )
@@ -452,9 +467,10 @@ with st.expander(f"🔵 LOW Confidence — Full Manual Classification ({len(low_
 st.divider()
 if st.button("Export Final Results", type="primary"):
     exported = _build_export_df(review_df)
+    _export_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     st.download_button(
         "Download reviewed CSV",
         data=exported.to_csv(index=False),
-        file_name="reviewed_output.csv",
+        file_name=f"reviewed_output_{_export_ts}.csv",
         mime="text/csv",
     )

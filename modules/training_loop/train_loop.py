@@ -128,7 +128,7 @@ def train_model_loop(
         model_path, summary_path = run_saver.save_artifacts(
             config, run_summary
         )
-        run_saver.plot_history(best_epoch, config["save_dir"], config["save_name"], class_dict=config.get("class_dict"))
+        run_saver.plot_history(best_epoch, config)
 
         if config.get("log_leaderboard", True):
             if config.get("is_hyperparameter_search", False):

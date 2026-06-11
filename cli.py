@@ -10,8 +10,8 @@ import click
 import pandas as pd
 import torch
 
-from api import get_leaderboard, get_model_details, infer, train
-
+from api import get_leaderboard, get_model_details, train
+from api.infer import infer
 
 def _arch_display(model_type_raw: object) -> str:
     mt = str(model_type_raw).lower().strip().replace(" ", "_")

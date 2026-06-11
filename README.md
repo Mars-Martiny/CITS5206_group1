@@ -44,8 +44,14 @@ Requires **conda** and **Python 3.12 or higher**.
 
 ### Prerequisites
 
-- **conda** — [Installation guide](https://docs.conda.io/projects/conda/en/stable/user-guide/install/index.html)
+- **conda** — [Installation guide](https://docs.conda.io/projects/conda/en/stable/user-guide/install/index.html) — must be callable from your terminal before running any installer script
 - **Python 3.12+**
+- **GPU acceleration software** (optional, for NVIDIA/AMD GPU support)
+  - NVIDIA CUDA — [cuda-downloads](https://developer.nvidia.com/cuda-downloads)
+  - AMD ROCm (Linux) — [install-radeon native Linux](https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/docs/install/installrad/native_linux/install-radeon.html)
+  - AMD ROCm (Windows) — [install-pytorch Windows](https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/docs/install/installrad/windows/install-pytorch.html)
+
+  > The automatic installer uses **CUDA 13.0** for NVIDIA GPUs. If your driver only supports an older CUDA version, skip the automatic installer and follow the [Manual](#manual) steps to install PyTorch with the matching CUDA build yourself.
 
 ### Automatic (Recommended)
 
@@ -68,12 +74,18 @@ chmod +x install.sh run_ui.sh build_docs.sh
 
 #### Windows
 
-> The `.bat` scripts are AI-converted from the tested `.sh` scripts and have **not** been tested. Use with caution.
+> Tested on MSI Katana 15 B13VGK, Windows 11 Pro (build 26200.8037). The `.bat` scripts are AI-converted from the `.sh` scripts.
 
 ```bat
 install.bat           :: first-time setup
 install.bat --force   :: reinstall from scratch
 ```
+
+**Known limitations / common issues (Windows)**
+
+- **conda not found** — make sure conda is initialised and callable from your terminal (`conda --version` should work) before running the script. If not, run the Anaconda/Miniconda installer again and enable the "Add to PATH" option, or open an Anaconda Prompt instead.
+- **CondaToSNonInteractiveError** — conda is waiting for you to accept its Terms of Service. Run `conda tos accept` in your terminal (or open the Anaconda Navigator once to accept the ToS there), then re-run the installer.
+- **CUDA version mismatch** — `install.bat` installs the **CUDA 13.0** PyTorch build. If your GPU driver only supports an older CUDA version (check with `nvidia-smi`), the GPU will not be detected at runtime. In that case, follow the [Manual](#manual) steps and install PyTorch against the CUDA version your driver supports (e.g. `cu128` for CUDA 12.8).
 
 ### Manual
 

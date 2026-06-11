@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import platform
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from app.app import list_trained_models, save_uploaded_file
+from app.app import TMP_DIR, list_trained_models, save_uploaded_file
 from app.components.banner import show_instruction_banner
 
 _SORT_OPTIONS = ["val_f1_macro", "test_f1_macro", "val_accuracy", "training_time_sec"]
@@ -86,7 +88,14 @@ _, damage_model_dir = _build_model_selectbox("Damage model", "damage", sort_by)
 
 st.subheader("Dataset")
 input_csv = st.file_uploader("Input CSV", type=["csv"])
-output_path = st.text_input("Output file path", value="/tmp/inference_output.csv")
+_default_output = str(TMP_DIR / "inference_output_<timestamp>.csv")
+output_path = st.text_input("Output file path", value=_default_output)
+if platform.system() == "Linux":
+    st.caption(f"Linux machine detected, saving to `/tmp` by default. `<timestamp>` is replaced with `yyyymmdd_hhmmss` at run time.")
+else:
+    st.caption(f"Non-Linux machine detected. saving to project root `{TMP_DIR}` by default. \
+    Please note that it is not automatically deleted so manual cleaning should be excercised regularly.")
+    st.caption(f"`<timestamp>` is replaced with `yyyymmdd_hhmmss` at run time. Saving to `{TMP_DIR}` by default.")
 text_col = st.text_input("Text column", value="description")
 
 if st.button("Run Inference", type="primary"):
@@ -99,6 +108,10 @@ if st.button("Run Inference", type="primary"):
 
     dataset_path = str(save_uploaded_file(input_csv))
 
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    resolved_output = output_path.replace("<timestamp>", ts)
+    Path(resolved_output).parent.mkdir(parents=True, exist_ok=True)
+
     import api
 
     with st.spinner("Running inference…"):
@@ -107,14 +120,14 @@ if st.button("Run Inference", type="primary"):
                 dataset_path=dataset_path,
                 energy_model_dir=energy_model_dir,
                 damage_model_dir=damage_model_dir,
-                output_path=output_path,
+                output_path=resolved_output,
                 text_col=text_col,
             )
         except Exception as exc:
             st.error(f"Inference failed: {exc}")
             st.stop()
 
-    st.success(f"Scored {len(df)} rows. Saved to {output_path}")
+    st.success(f"Scored {len(df)} rows. Saved to {resolved_output}")
 
     metric_cols = st.columns(4)
     col_idx = 0
@@ -138,6 +151,6 @@ if st.button("Run Inference", type="primary"):
     st.download_button(
         "Download CSV",
         data=df.to_csv(index=False),
-        file_name="inference_output.csv",
+        file_name=Path(resolved_output).name,
         mime="text/csv",
     )

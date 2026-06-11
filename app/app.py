@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import platform
 import tempfile
 from pathlib import Path
 from typing import NamedTuple
@@ -11,6 +12,7 @@ import streamlit as st
 
 TRAINED_MODELS_DIR = Path(__file__).resolve().parents[1] / "trained_models"
 DATASET_DIR = Path(__file__).resolve().parents[1] / "dataset"
+TMP_DIR = Path("/tmp") if platform.system() == "Linux" else Path(__file__).resolve().parents[1] / "tmp"
 
 
 class ModelEntry(NamedTuple):
@@ -63,8 +65,9 @@ def list_trained_models(task_filter: str | None = None) -> list[ModelEntry]:
 
 def save_uploaded_file(uploaded_file) -> Path:
     """Persist a Streamlit UploadedFile to a temp path and return it."""
+    TMP_DIR.mkdir(parents=True, exist_ok=True)
     suffix = Path(uploaded_file.name).suffix
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir="/tmp") as f:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir=TMP_DIR) as f:
         f.write(uploaded_file.getbuffer())
         return Path(f.name)
 

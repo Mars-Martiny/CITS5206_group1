@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import platform
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -411,11 +413,12 @@ with summary_cols[5]:
 
 save_col, _ = st.columns([1, 3])
 with save_col:
+    _save_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     progress_csv = _build_export_df(review_df).to_csv(index=False)
     st.download_button(
         "💾 Save Progress",
         data=progress_csv,
-        file_name="review_in_progress.csv",
+        file_name=f"review_in_progress_{_save_ts}.csv",
         mime="text/csv",
         help="Download current state. Re-upload this file tomorrow to resume where you left off.",
     )
@@ -464,9 +467,10 @@ with st.expander(f"🔵 LOW Confidence — Full Manual Classification ({len(low_
 st.divider()
 if st.button("Export Final Results", type="primary"):
     exported = _build_export_df(review_df)
+    _export_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     st.download_button(
         "Download reviewed CSV",
         data=exported.to_csv(index=False),
-        file_name="reviewed_output.csv",
+        file_name=f"reviewed_output_{_export_ts}.csv",
         mime="text/csv",
     )

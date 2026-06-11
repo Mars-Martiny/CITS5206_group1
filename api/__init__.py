@@ -24,27 +24,27 @@ def __getattr__(name: str) -> Any:
     """Lazily expose heavier API functions only when requested."""
     if name == "load_model":
         from .loader import load_model
-
+        globals()["load_model"] = load_model
         return load_model
 
     if name == "infer":
         from .infer import infer
-
+        globals()["infer"] = infer
         return infer
 
     if name == "get_leaderboard":
         from .metrics import get_leaderboard
-
+        globals()["get_leaderboard"] = get_leaderboard
         return get_leaderboard
 
     if name == "get_model_details":
         from .metrics import get_model_details
-
+        globals()["get_model_details"] = get_model_details
         return get_model_details
 
     if name == "retrain":
         from .retrain import retrain
-
+        globals()["retrain"] = retrain
         return retrain
 
     raise AttributeError(f"module 'api' has no attribute {name!r}")
